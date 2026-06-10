@@ -2392,3 +2392,254 @@ textarea[required]::placeholder {
     grid-template-columns: 1fr;
   }
 }
+
+/* Boss cockpit / receivables intelligence modules (front-end only) */
+.metrics-grid {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.metric.warn strong {
+  color: var(--accent);
+}
+
+.cockpit-grid,
+.profit-rank-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.profit-rank-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.highlight-panel {
+  min-height: 210px;
+}
+
+.danger-panel {
+  border-color: #ffd8d2;
+  background: linear-gradient(180deg, #fff, #fff7f5);
+}
+
+.aging-strip {
+  display: grid;
+  gap: 10px;
+}
+
+.aging-segment,
+.mini-rank-row,
+.rank-item,
+.customer-upgrade-grid article,
+.risk-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.aging-segment {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 88px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.aging-segment span,
+.aging-segment em,
+.mini-rank-row span,
+.rank-item span,
+.customer-upgrade-grid span,
+.risk-card span,
+.aging-card em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.aging-segment strong,
+.mini-rank-row strong,
+.rank-item em {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.mini-rank {
+  display: grid;
+  gap: 8px;
+}
+
+.mini-rank-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+}
+
+.mini-rank-row b,
+.rank-item b {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 12px;
+}
+
+.mini-rank-row.danger b,
+.rank-item.negative b {
+  background: var(--danger);
+}
+
+.module-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ffffff, #eef8f5);
+  box-shadow: var(--shadow);
+}
+
+.module-hero.risk-hero {
+  background: linear-gradient(135deg, #ffffff, #fff3ef);
+}
+
+.module-hero.profit-hero {
+  background: linear-gradient(135deg, #ffffff, #fff8e8);
+}
+
+.module-hero h3,
+.module-hero p {
+  margin: 0;
+}
+
+.module-hero h3 {
+  font-size: 26px;
+  margin-bottom: 6px;
+}
+
+.module-hero p:not(.eyebrow) {
+  max-width: 760px;
+  color: var(--muted);
+}
+
+.aging-metrics {
+  margin-bottom: 18px;
+}
+
+.aging-card em {
+  display: block;
+  margin-top: 8px;
+}
+
+.aging-table {
+  min-width: 980px;
+}
+
+.aging-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #eef8f5;
+  color: var(--brand-dark);
+  font-weight: 800;
+}
+
+.risk-summary-grid,
+.customer-upgrade-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.risk-card,
+.customer-upgrade-grid article {
+  padding: 16px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.risk-card.hot {
+  border-color: #ffc9c0;
+  background: var(--danger-soft);
+}
+
+.risk-card strong,
+.customer-upgrade-grid strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 26px;
+}
+
+.risk-card em {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-style: normal;
+}
+
+.risk-table {
+  min-width: 1120px;
+}
+
+.rank-list {
+  display: grid;
+  gap: 10px;
+}
+
+.rank-item {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #fff;
+}
+
+.rank-item div {
+  display: grid;
+  gap: 4px;
+}
+
+.rank-item em {
+  color: var(--brand-dark);
+  font-style: normal;
+  font-weight: 900;
+}
+
+.rank-item.negative {
+  border-color: #ffd0ca;
+  background: #fff7f5;
+}
+
+.rank-item.negative em {
+  color: var(--danger);
+}
+
+.customer-ledger-table {
+  min-width: 1320px;
+}
+
+@media (max-width: 1180px) {
+  .cockpit-grid,
+  .profit-rank-grid,
+  .risk-summary-grid,
+  .customer-upgrade-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .module-hero {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
