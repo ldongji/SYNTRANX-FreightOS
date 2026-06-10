@@ -256,6 +256,16 @@ const els = {
   profileRows: document.querySelector("#profileRows"),
   openShipmentRows: document.querySelector("#openShipmentRows"),
   customerBars: document.querySelector("#customerBars"),
+  dashboardAgingStrip: document.querySelector("#dashboardAgingStrip"),
+  dashboardProfitRank: document.querySelector("#dashboardProfitRank"),
+  dashboardRiskCustomers: document.querySelector("#dashboardRiskCustomers"),
+  agingBucketCards: document.querySelector("#agingBucketCards"),
+  agingRows: document.querySelector("#agingRows"),
+  riskSummaryCards: document.querySelector("#riskSummaryCards"),
+  riskCustomerRows: document.querySelector("#riskCustomerRows"),
+  customerProfitRank: document.querySelector("#customerProfitRank"),
+  shipmentProfitRank: document.querySelector("#shipmentProfitRank"),
+  customerUpgradeCards: document.querySelector("#customerUpgradeCards"),
   expenseBars: document.querySelector("#expenseBars"),
   opsStages: document.querySelector("#opsStages"),
   shipmentDialog: document.querySelector("#shipmentDialog"),
@@ -937,6 +947,117 @@ function expenseSummary() {
     .sort((a, b) => b.amount - a.amount);
 }
 
+
+function dateAgeDays(dateValue) {
+  if (!dateValue) return 0;
+  const start = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return 0;
+  const end = new Date(`${today()}T00:00:00`);
+  return Math.max(0, Math.floor((end - start) / 86400000));
+}
+
+const AGING_BUCKETS = [
+  { key: "0-7", label: "0-7天", min: 0, max: 7 },
+  { key: "8-15", label: "8-15天", min: 8, max: 15 },
+  { key: "16-30", label: "16-30天", min: 16, max: 30 },
+  { key: "31-60", label: "31-60天", min: 31, max: 60 },
+  { key: "60+", label: "60天以上", min: 61, max: Infinity },
+];
+
+function agingBucketForDays(days) {
+  return AGING_BUCKETS.find((bucket) => days >= bucket.min && days <= bucket.max) || AGING_BUCKETS[0];
+}
+
+function openShipmentSettlements() {
+  return state.shipments
+    .map((shipment) => {
+      const st = settlement(shipment);
+      const ageDays = dateAgeDays(shipment.date);
+      const bucket = agingBucketForDays(ageDays);
+      return { ...shipment, ...st, ageDays, agingBucket: bucket.key, agingLabel: bucket.label };
+    })
+    .filter((row) => row.open > 0.009)
+    .sort((a, b) => b.ageDays - a.ageDays || b.open - a.open);
+}
+
+function agingBucketSummary() {
+  const summary = AGING_BUCKETS.map((bucket) => ({ ...bucket, amount: 0, count: 0, customers: new Set() }));
+  const map = new Map(summary.map((bucket) => [bucket.key, bucket]));
+  openShipmentSettlements().forEach((row) => {
+    const bucket = map.get(row.agingBucket);
+    if (!bucket) return;
+    bucket.amount += row.open;
+    bucket.count += 1;
+    if (row.customer) bucket.customers.add(row.customer);
+  });
+  return summary.map((bucket) => ({ ...bucket, customerCount: bucket.customers.size }));
+}
+
+function customerPerformanceSummary() {
+  const map = new Map();
+  for (const shipment of state.shipments) {
+    if (!shipment.customer) continue;
+    if (!shipmentMatchesCustomerLedgerFilters(shipment)) continue;
+    const st = settlement(shipment);
+    const current = map.get(shipment.customer) || {
+      customer: shipment.customer,
+      count: 0,
+      receivable: 0,
+      paid: 0,
+      open: 0,
+      profit: 0,
+      maxAgeDays: 0,
+      overdueAmount: 0,
+      lastDate: "",
+      currencies: [],
+    };
+    const ageDays = st.open > 0.009 ? dateAgeDays(shipment.date) : 0;
+    current.count += 1;
+    current.receivable += st.shouldReceive;
+    current.paid += st.paid;
+    current.open += st.open;
+    current.profit += st.profit;
+    current.maxAgeDays = Math.max(current.maxAgeDays, ageDays);
+    if (ageDays > 30) current.overdueAmount += st.open;
+    current.lastDate = current.lastDate && current.lastDate > shipment.date ? current.lastDate : shipment.date;
+    current.currencies = unique([...current.currencies, ...receivableCurrenciesForShipment(shipment)]);
+    map.set(shipment.customer, current);
+  }
+  return [...map.values()].map((customer) => ({
+    ...customer,
+    collectionRate: customer.receivable > 0 ? customer.paid / customer.receivable : 0,
+  })).sort((a, b) => b.open - a.open);
+}
+
+function enhancedRiskLevel(customer) {
+  if (customer.open <= 0.009) return "正常";
+  if (customer.maxAgeDays > 60 || customer.open >= 50000 || customer.collectionRate < 0.25) return "高风险";
+  if (customer.maxAgeDays > 30 || customer.open >= 10000 || customer.collectionRate < 0.65) return "需跟进";
+  return "低风险";
+}
+
+function riskSuggestion(customer) {
+  const level = enhancedRiskLevel(customer);
+  if (level === "高风险") return "暂停放货/老板确认授信";
+  if (level === "需跟进") return "48小时内催收并复核账单";
+  if (customer.open > 0) return "正常提醒回款";
+  return "保持合作";
+}
+
+function customerProfitRanking() {
+  return customerPerformanceSummary().sort((a, b) => b.profit - a.profit);
+}
+
+function shipmentProfitRanking() {
+  return state.shipments
+    .map((shipment) => ({ ...shipment, ...settlement(shipment) }))
+    .sort((a, b) => b.profit - a.profit);
+}
+
+function percent(value) {
+  return `${Math.round(number(value) * 100)}%`;
+}
+
 function riskLevel(customer) {
   if (customer.open <= 0) return "正常";
   const ratio = customer.receivable > 0 ? customer.open / customer.receivable : 0;
@@ -1031,6 +1152,9 @@ function render() {
   ensureExpenseDrafts();
   renderExpenseDrafts();
   renderMetrics();
+  renderAgingAnalysis();
+  renderRiskCustomers();
+  renderProfitRank();
   renderOperations();
   renderAirlineOperations();
   renderBookings();
@@ -1127,6 +1251,11 @@ function renderMetrics() {
   document.querySelector("#totalPaid").textContent = money(totals.paid);
   document.querySelector("#totalOpen").textContent = money(totals.open);
   document.querySelector("#totalProfit").textContent = money(totals.profit);
+  const performanceRows = customerPerformanceSummary();
+  const overdueCount = performanceRows.filter((customer) => customer.open > 0.009 && customer.maxAgeDays > 30).length;
+  const collectionRate = totals.receivable > 0 ? totals.paid / totals.receivable : 0;
+  document.querySelector("#overdueCustomerCount").textContent = overdueCount;
+  document.querySelector("#collectionRate").textContent = percent(collectionRate);
 
   const stageDefs = [
     ["待入仓", ["新货入仓"]],
@@ -1172,6 +1301,43 @@ function renderMetrics() {
       <td><span class="status ${paymentStatusClass(s.status)}">${escapeHtml(s.status)}</span></td>
     </tr>
   `).join("") : `<tr><td colspan="4" class="empty">暂无待跟进业务</td></tr>`;
+
+  renderDashboardInsights();
+}
+
+function renderDashboardInsights() {
+  if (els.dashboardAgingStrip) {
+    const buckets = agingBucketSummary();
+    const totalOpen = buckets.reduce((sum, bucket) => sum + bucket.amount, 0) || 1;
+    els.dashboardAgingStrip.innerHTML = buckets.map((bucket) => `
+      <article class="aging-segment">
+        <span>${escapeHtml(bucket.label)}</span>
+        <strong>${money(bucket.amount)}</strong>
+        <em>${bucket.count}票 · ${percent(bucket.amount / totalOpen)}</em>
+      </article>
+    `).join("");
+  }
+
+  if (els.dashboardProfitRank) {
+    const rows = customerProfitRanking().slice(0, 5);
+    els.dashboardProfitRank.innerHTML = rows.length ? rows.map((row, index) => `
+      <div class="mini-rank-row">
+        <b>${index + 1}</b><span>${escapeHtml(row.customer)}</span><strong class="money">${money(row.profit)}</strong>
+      </div>
+    `).join("") : `<div class="empty">暂无利润数据</div>`;
+  }
+
+  if (els.dashboardRiskCustomers) {
+    const rows = customerPerformanceSummary()
+      .filter((row) => row.open > 0.009)
+      .sort((a, b) => b.maxAgeDays - a.maxAgeDays || b.open - a.open)
+      .slice(0, 5);
+    els.dashboardRiskCustomers.innerHTML = rows.length ? rows.map((row, index) => `
+      <div class="mini-rank-row danger">
+        <b>${index + 1}</b><span>${escapeHtml(row.customer)} · ${escapeHtml(enhancedRiskLevel(row))}</span><strong class="money">${money(row.open)}</strong>
+      </div>
+    `).join("") : `<div class="empty">暂无风险客户</div>`;
+  }
 }
 
 function operationSide(status) {
@@ -1698,9 +1864,117 @@ function renderPayments() {
   }).join("") : `<tr><td colspan="12" class="empty">暂无回款记录</td></tr>`;
 }
 
+
+function renderAgingAnalysis() {
+  if (!els.agingBucketCards && !els.agingRows) return;
+  const buckets = agingBucketSummary();
+  if (els.agingBucketCards) {
+    els.agingBucketCards.innerHTML = buckets.map((bucket) => `
+      <article class="metric aging-card ${bucket.key === "60+" ? "alert" : ""}">
+        <span>${escapeHtml(bucket.label)}</span>
+        <strong>${money(bucket.amount)}</strong>
+        <em>${bucket.count}票 / ${bucket.customerCount}客户</em>
+      </article>
+    `).join("");
+  }
+  if (els.agingRows) {
+    const rows = openShipmentSettlements();
+    els.agingRows.innerHTML = rows.length ? rows.map((row) => `
+      <tr>
+        <td><span class="aging-pill">${row.ageDays}天 · ${escapeHtml(row.agingLabel)}</span></td>
+        <td>${escapeHtml(row.customer)}</td>
+        <td>${escapeHtml(row.waybill || row.masterNo || "")}</td>
+        <td>${escapeHtml(row.date || "")}</td>
+        <td class="money">${money(row.shouldReceive)}</td>
+        <td class="money">${money(row.paid)}</td>
+        <td class="money">${money(row.open)}</td>
+        <td><span class="status ${paymentStatusClass(row.status)}">${escapeHtml(row.status)}</span></td>
+      </tr>
+    `).join("") : `<tr><td colspan="8" class="empty">暂无未收账龄</td></tr>`;
+  }
+}
+
+function renderRiskCustomers() {
+  if (!els.riskSummaryCards && !els.riskCustomerRows) return;
+  const rows = customerPerformanceSummary().filter((row) => row.open > 0.009);
+  const groups = ["高风险", "需跟进", "低风险"].map((level) => {
+    const items = rows.filter((row) => enhancedRiskLevel(row) === level);
+    return { level, count: items.length, amount: items.reduce((sum, row) => sum + row.open, 0) };
+  });
+  if (els.riskSummaryCards) {
+    els.riskSummaryCards.innerHTML = groups.map((group) => `
+      <article class="risk-card ${group.level === "高风险" ? "hot" : ""}">
+        <span>${escapeHtml(group.level)}</span>
+        <strong>${group.count}</strong>
+        <em>${money(group.amount)}</em>
+      </article>
+    `).join("");
+  }
+  if (els.riskCustomerRows) {
+    const sorted = rows.sort((a, b) => {
+      const weight = { 高风险: 3, 需跟进: 2, 低风险: 1, 正常: 0 };
+      return (weight[enhancedRiskLevel(b)] || 0) - (weight[enhancedRiskLevel(a)] || 0) || b.open - a.open;
+    });
+    els.riskCustomerRows.innerHTML = sorted.length ? sorted.map((row) => {
+      const level = enhancedRiskLevel(row);
+      return `
+      <tr>
+        <td><button class="link-cell" type="button" data-preview-customer="${escapeHtml(row.customer)}" data-jump="customers">${escapeHtml(row.customer)}</button></td>
+        <td><span class="status ${level === "高风险" ? "open" : level === "需跟进" ? "balance" : "paid"}">${escapeHtml(level)}</span></td>
+        <td class="money">${money(row.open)}</td>
+        <td>${row.maxAgeDays}天</td>
+        <td>${percent(row.collectionRate)}</td>
+        <td class="money">${money(row.profit)}</td>
+        <td>${escapeHtml(row.lastDate)}</td>
+        <td>${escapeHtml(riskSuggestion(row))}</td>
+      </tr>`;
+    }).join("") : `<tr><td colspan="8" class="empty">暂无风险客户</td></tr>`;
+  }
+}
+
+function renderProfitRank() {
+  if (!els.customerProfitRank && !els.shipmentProfitRank) return;
+  if (els.customerProfitRank) {
+    const rows = customerProfitRanking();
+    els.customerProfitRank.innerHTML = rows.length ? rows.map((row, index) => renderRankItem(index, row.customer, money(row.profit), `收入 ${money(row.receivable)} · 未收 ${money(row.open)} · ${percent(row.collectionRate)}`))
+      .join("") : `<div class="empty">暂无客户利润数据</div>`;
+  }
+  if (els.shipmentProfitRank) {
+    const rows = shipmentProfitRanking();
+    els.shipmentProfitRank.innerHTML = rows.length ? rows.map((row, index) => renderRankItem(index, row.waybill || row.masterNo || "未填单号", money(row.profit), `${row.customer || "-"} · 应收 ${money(row.shouldReceive)} · 成本 ${money(row.cost)}`, row.profit < 0))
+      .join("") : `<div class="empty">暂无业务利润数据</div>`;
+  }
+}
+
+function renderRankItem(index, title, value, meta, negative = false) {
+  return `
+    <article class="rank-item ${negative ? "negative" : ""}">
+      <b>${index + 1}</b>
+      <div><strong>${escapeHtml(title)}</strong><span>${escapeHtml(meta)}</span></div>
+      <em class="money">${escapeHtml(value)}</em>
+    </article>
+  `;
+}
+
+function renderCustomerUpgradeCards() {
+  if (!els.customerUpgradeCards) return;
+  const rows = customerPerformanceSummary();
+  const totalOpen = rows.reduce((sum, row) => sum + row.open, 0);
+  const highRisk = rows.filter((row) => enhancedRiskLevel(row) === "高风险").length;
+  const overdueAmount = rows.reduce((sum, row) => sum + row.overdueAmount, 0);
+  const avgCollection = rows.length ? rows.reduce((sum, row) => sum + row.collectionRate, 0) / rows.length : 0;
+  els.customerUpgradeCards.innerHTML = `
+    <article><span>客户未收合计</span><strong>${money(totalOpen)}</strong></article>
+    <article><span>高风险客户</span><strong>${highRisk}</strong></article>
+    <article><span>30天以上逾期</span><strong>${money(overdueAmount)}</strong></article>
+    <article><span>平均收款率</span><strong>${percent(avgCollection)}</strong></article>
+  `;
+}
+
 function renderCustomers() {
   const q = document.querySelector("#customerSearch").value.trim().toLowerCase();
   const rows = customerSummary().filter((c) => !q || c.customer.toLowerCase().includes(q));
+  renderCustomerUpgradeCards();
   const pendingRows = rows.filter((c) => number(c.open) > 0.009);
   const completedRows = rows.filter((c) => number(c.open) <= 0.009);
   els.customerRows.innerHTML = renderCustomerSummaryRows(pendingRows, "暂无未完成结算客户单位");
@@ -1711,7 +1985,11 @@ function renderCustomers() {
 }
 
 function renderCustomerSummaryRows(rows, emptyText, completed = false) {
-  return rows.length ? rows.map((c) => `
+  const performanceMap = new Map(customerPerformanceSummary().map((row) => [row.customer, row]));
+  return rows.length ? rows.map((c) => {
+    const perf = performanceMap.get(c.customer) || c;
+    const risk = enhancedRiskLevel(perf);
+    return `
     <tr>
       <td><button class="link-cell" type="button" data-preview-customer="${escapeHtml(c.customer)}">${escapeHtml(c.customer)}</button></td>
       <td>${c.count}</td>
@@ -1719,10 +1997,13 @@ function renderCustomerSummaryRows(rows, emptyText, completed = false) {
       <td>${escapeHtml((c.currencies || ["RMB"]).join(" / "))}</td>
       <td class="money">${money(c.paid)}</td>
       <td class="money">${money(c.open)}</td>
-      <td><span class="status ${completed ? "paid" : riskLevel(c) === "高风险" ? "open" : "paid"}">${completed ? "完成结算" : escapeHtml(riskLevel(c))}</span></td>
+      <td><span class="status ${completed ? "paid" : risk === "高风险" ? "open" : risk === "需跟进" ? "balance" : "paid"}">${completed ? "完成结算" : escapeHtml(risk)}</span></td>
+      <td>${perf.maxAgeDays || 0}天</td>
+      <td>${percent(perf.collectionRate || 0)}</td>
+      <td class="money">${money(perf.profit || 0)}</td>
       <td>${escapeHtml(c.lastDate)}</td>
-    </tr>
-  `).join("") : `<tr><td colspan="8" class="empty">${escapeHtml(emptyText)}</td></tr>`;
+    </tr>`;
+  }).join("") : `<tr><td colspan="11" class="empty">${escapeHtml(emptyText)}</td></tr>`;
 }
 
 function customerDetailRows(customer) {
@@ -5603,6 +5884,7 @@ function bindEvents() {
     }
     if (previewCustomer) {
       previewCustomerDetail(previewCustomer);
+      if (target.dataset.jump === "customers") switchView("customers");
       return;
     }
     if (fillCustomerSearch) {
