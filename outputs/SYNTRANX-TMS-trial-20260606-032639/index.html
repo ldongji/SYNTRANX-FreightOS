@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>收货出货与应收核销系统</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <button class="sidebar-toggle" id="sidebarToggle" title="收起/展开侧边栏" aria-label="收起或展开侧边栏">
+        <span></span>
+      </button>
+      <div class="brand">
+        <div class="brand-mark">新创</div>
+        <div>
+          <h1>跨境物流系统</h1>
+          <p>TMS · 财务 · 客户</p>
+        </div>
+      </div>
+
+      <nav class="nav" aria-label="主导航">
+        <button class="nav-item active" data-view="dashboard">
+          <span>运营总览</span>
+        </button>
+        <button class="nav-item" data-view="shipments">
+          <span>运单中心</span>
+        </button>
+        <button class="nav-item" data-view="payments">
+          <span>财务核销</span>
+        </button>
+        <button class="nav-item" data-view="customers">
+          <span>客户账款</span>
+        </button>
+        <button class="nav-item" data-view="finance">
+          <span>费用报表</span>
+        </button>
+        <button class="nav-item" data-view="settings">
+          <span>基础资料</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="ghost-btn" id="exportAllBtn">导出全部数据</button>
+        <button class="danger-link" id="resetDemoBtn">清空本机数据</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">跨境物流运营工作台</p>
+          <h2 id="viewTitle">总览</h2>
+        </div>
+        <div class="top-actions">
+          <label class="file-import">
+            导入登记CSV
+            <input type="file" id="shipmentImport" accept=".csv,text/csv">
+          </label>
+          <button class="secondary-btn" id="statementBtn">导出账单</button>
+          <button class="primary-btn" id="quickShipmentBtn">新增业务</button>
+          <button class="secondary-btn" id="quickPaymentBtn">登记回款</button>
+        </div>
+      </header>
+
+      <section class="view active" id="dashboardView">
+        <div class="metrics-grid">
+          <article class="metric">
+            <span>总应收</span>
+            <strong id="totalReceivable">0</strong>
+          </article>
+          <article class="metric">
+            <span>已核销</span>
+            <strong id="totalPaid">0</strong>
+          </article>
+          <article class="metric alert">
+            <span>未收款</span>
+            <strong id="totalOpen">0</strong>
+          </article>
+          <article class="metric">
+            <span>毛利润</span>
+            <strong id="totalProfit">0</strong>
+          </article>
+        </div>
+
+        <section class="panel ops-panel">
+          <div class="panel-head">
+            <h3>运输节点监控</h3>
+            <button class="text-btn" data-jump="shipments">处理运单</button>
+          </div>
+          <div class="ops-stages" id="opsStages"></div>
+        </section>
+
+        <div class="dashboard-grid">
+          <section class="panel">
+            <div class="panel-head">
+              <h3>未收款客户排行</h3>
+              <button class="text-btn" data-jump="customers">查看客户应收</button>
+            </div>
+            <div id="customerBars" class="bars"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h3>待跟进业务</h3>
+              <button class="text-btn" data-jump="shipments">查看登记</button>
+            </div>
+            <div class="compact-table-wrap">
+              <table class="compact-table">
+                <thead>
+                  <tr>
+                    <th>客户</th>
+                    <th>运单号</th>
+                    <th>未收</th>
+                    <th>状态</th>
+                  </tr>
+                </thead>
+                <tbody id="openShipmentRows"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="shipmentsView">
+        <section class="entry-panel">
+          <div class="panel-head">
+            <h3>快速录入收货/出货</h3>
+            <button class="text-btn" id="openFullShipmentBtn">打开详细录入</button>
+          </div>
+          <form id="quickShipmentForm" class="quick-grid">
+            <label>日期<input name="date" type="date" required></label>
+            <label>客户<input name="customer" list="customerList" required></label>
+            <label>客户地址<input name="customerAddress"></label>
+            <label>收货人电话<input name="receiverPhone"></label>
+            <label>唛头<input name="mark" list="markList"></label>
+            <label>主单号<input name="masterNo" list="masterNoList"></label>
+            <label>运单号<input name="waybill" required></label>
+            <label>渠道<input name="channel" list="channelList"></label>
+            <label>始发地<input name="origin" list="originList"></label>
+            <label>目的地<input name="destination" list="destinationList"></label>
+            <label>业务类型<input name="mode" list="modeList"></label>
+            <label>件数<input name="ctn" type="number" step="1" min="0"></label>
+            <label>计费重量<input name="chargeWeight" type="number" step="0.01" min="0" required></label>
+            <label>卖价<span class="money-field"><input name="unitPrice" type="number" step="0.01" min="0" required><select name="unitPriceCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+            <label>货物状态<input name="shipmentStatus" list="shipmentStatusList"></label>
+            <label>付款方式<input name="terms" list="termsList"></label>
+            <label>品名/备注<input name="description" list="descriptionList"></label>
+            <button class="primary-btn" type="submit">保存登记</button>
+          </form>
+        </section>
+        <div class="toolbar">
+          <div class="search-wrap">
+            <input id="shipmentSearch" type="search" placeholder="搜索客户、唛头、主单号、运单号、品名">
+          </div>
+          <select id="shipmentStatusFilter">
+            <option value="">全部付款状态</option>
+            <option value="未付款N/P">未付款</option>
+            <option value="有余款">有余款</option>
+            <option value="已付款PAID">已付款</option>
+          </select>
+          <button class="secondary-btn" id="toggleShipmentDetailsBtn" type="button">展开经营明细</button>
+          <button class="secondary-btn" id="exportShipmentsBtn">导出登记</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table shipment-table shipment-details-hidden" id="shipmentTable">
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>客户</th>
+                <th>唛头</th>
+                <th>主单号</th>
+                <th>运单号</th>
+                <th class="detail-col">渠道</th>
+                <th>目的地</th>
+                <th class="detail-col">运输方式</th>
+                <th class="detail-col">运输节点</th>
+                <th>件数</th>
+                <th>计费重</th>
+                <th>卖价</th>
+                <th>应收</th>
+                <th>已核销</th>
+                <th>未收</th>
+                <th class="detail-col">总成本</th>
+                <th class="detail-col">毛利</th>
+                <th>盈亏</th>
+                <th>付款状态</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="shipmentRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="view" id="paymentsView">
+        <section class="entry-panel">
+          <div class="panel-head">
+            <h3>快速登记回款</h3>
+            <button class="text-btn" id="openFullPaymentBtn">打开详细回款</button>
+          </div>
+          <form id="quickPaymentForm" class="quick-grid payment">
+            <label>回款日期<input name="date" type="date" required></label>
+            <label>客户<input name="customer" list="customerList" required></label>
+            <label>运单号/主单号<input name="waybill" list="waybillList"></label>
+            <label>业务员<input name="account" list="paymentSalesList" placeholder="例如：BINGO"></label>
+            <label>币种<select name="currency"><option>RMB</option><option>AED</option><option>USD</option><option>SAR</option></select></label>
+            <label>金额<input name="amount" type="number" step="0.01" min="0" required></label>
+            <label>汇率<input name="rate" type="number" step="0.0001" min="0" value="1"></label>
+            <label>收款账户<input name="receiveAccount" list="paymentAccountList" placeholder="例如：公司公账"></label>
+            <label>方式<select name="method"><option>按运单核销</option><option>按客户预收/批量核销</option><option>退款/冲销</option><option>其他</option></select></label>
+            <label>备注<input name="note"></label>
+            <button class="primary-btn" type="submit">保存回款</button>
+          </form>
+        </section>
+        <div class="toolbar">
+          <div class="search-wrap">
+            <input id="paymentSearch" type="search" placeholder="搜索客户、主单号、运单号、业务员、收款账户、备注">
+          </div>
+          <button class="secondary-btn" id="exportPaymentsBtn">导出回款</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table payment-ledger-table">
+            <thead>
+              <tr>
+                <th>回款日期</th>
+                <th>客户</th>
+                <th>主单号</th>
+                <th>运单号</th>
+                <th>业务员</th>
+                <th>币种</th>
+                <th>金额</th>
+                <th>汇率</th>
+                <th>核销RMB</th>
+                <th>收款账户</th>
+                <th>方式</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="paymentRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="view" id="customersView">
+        <div class="toolbar">
+          <div class="search-wrap">
+            <input id="customerSearch" type="search" placeholder="搜索客户">
+            <div class="suggest-list" id="customerSearchSuggest"></div>
+          </div>
+          <button class="secondary-btn" id="exportCustomerLedgerPdfBtn">导出总账目录PDF</button>
+          <button class="secondary-btn" id="exportCustomerLedgerExcelBtn">导出总账目录Excel</button>
+          <button class="secondary-btn" id="exportCustomerReceivablePdfBtn">导出PDF账单</button>
+          <button class="secondary-btn" id="exportCustomerReceivableExcelBtn">导出Excel账单</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table customer-ledger-table">
+            <thead>
+              <tr>
+                <th>客户单位</th>
+                <th>票数</th>
+                <th>总应收</th>
+                <th>应收币种</th>
+                <th>已核销</th>
+                <th>未收</th>
+                <th>风险等级</th>
+                <th>最后业务日期</th>
+              </tr>
+            </thead>
+            <tbody id="customerRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="view" id="financeView">
+        <div class="metrics-grid finance-metrics">
+          <article class="metric">
+            <span>总收入</span>
+            <strong id="financeRevenue">0</strong>
+          </article>
+          <article class="metric">
+            <span>业务总成本</span>
+            <strong id="financeBizCost">0</strong>
+          </article>
+          <article class="metric">
+            <span>业务毛利</span>
+            <strong id="financeGrossProfit">0</strong>
+          </article>
+          <article class="metric alert">
+            <span>日常开销</span>
+            <strong id="financeExpense">0</strong>
+          </article>
+          <article class="metric">
+            <span>净利润</span>
+            <strong id="financeNetProfit">0</strong>
+          </article>
+        </div>
+
+        <div class="finance-grid">
+          <section class="entry-panel">
+            <div class="panel-head">
+              <h3>费用登记</h3>
+              <div class="panel-actions">
+                <button class="secondary-btn small" id="addExpenseDraftBtn">新增一行</button>
+                <button class="primary-btn small" id="saveExpenseDraftsBtn">保存全部费用</button>
+                <button class="secondary-btn small" id="exportFinancePdfBtn">导出汇总PDF</button>
+                <button class="secondary-btn small" id="exportFinanceExcelBtn">导出汇总Excel</button>
+                <button class="secondary-btn small" id="exportExpensesBtn">导出费用</button>
+              </div>
+            </div>
+            <div class="expense-entry-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>日期</th>
+                    <th>费用类别</th>
+                    <th>支付账户</th>
+                    <th>金额</th>
+                    <th>币种</th>
+                    <th>汇率</th>
+                    <th>说明</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="expenseDraftRows"></tbody>
+              </table>
+            </div>
+            <p class="form-hint" id="expenseRateHint">费用页面汇率会自动匹配当天市场行情，也可以手动修改。</p>
+            <div class="table-wrap expense-table">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>日期</th>
+                    <th>类别</th>
+                    <th>账户</th>
+                    <th>金额</th>
+                    <th>币种</th>
+                    <th>折算RMB</th>
+                    <th>说明</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="expenseRows"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h3>费用去向</h3>
+            </div>
+            <div id="expenseBars" class="bars"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="settingsView">
+        <div class="settings-grid">
+          <section class="panel">
+            <div class="panel-head">
+              <h3>客户资料</h3>
+              <div class="panel-actions">
+                <button class="secondary-btn small" id="exportCustomerTemplateBtn">下载客户模板</button>
+                <label class="file-import small">
+                  导入客户CSV
+                  <input type="file" id="customerImport" accept=".csv,text/csv">
+                </label>
+                <button class="secondary-btn small" id="addCustomerBtn">新增客户</button>
+              </div>
+            </div>
+            <div class="table-wrap compact">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>唛头</th>
+                    <th>发货人</th>
+                    <th>收货人</th>
+                    <th>电话</th>
+                    <th>地址/备注</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="profileRows"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h3>常用选项</h3>
+            </div>
+            <div class="option-add-grid">
+              <form class="inline-add" data-option-key="channels">
+                <label>新增渠道<input name="value" placeholder="例如：天龙"></label>
+                <button class="secondary-btn small" type="submit">添加</button>
+              </form>
+              <form class="inline-add" data-option-key="destinations">
+                <label>新增目的地<input name="value" placeholder="例如：迪拜DXB"></label>
+                <button class="secondary-btn small" type="submit">添加</button>
+              </form>
+              <form class="inline-add" data-option-key="modes">
+                <label>新增运输方式<input name="value" placeholder="例如：空运双清AIR"></label>
+                <button class="secondary-btn small" type="submit">添加</button>
+              </form>
+              <form class="inline-add" data-option-key="lastMiles">
+                <label>新增末端派送商<input name="value" placeholder="例如：TERRY、ALI"></label>
+                <button class="secondary-btn small" type="submit">添加</button>
+              </form>
+            </div>
+            <form id="optionForm" class="stack-form">
+              <label>渠道<input name="channels" placeholder="例如：天龙、海秦HQ，用逗号隔开"></label>
+              <label>目的地<input name="destinations" placeholder="例如：迪拜DXB、沙特KSA，用逗号隔开"></label>
+              <label>运输方式<input name="modes" placeholder="例如：空运双清AIR，用逗号隔开"></label>
+              <label>末端派送商<input name="lastMiles" placeholder="例如：TERRY、ALI，用逗号隔开"></label>
+              <button class="primary-btn" type="submit">保存选项</button>
+            </form>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="shipmentDialog" class="modal">
+    <form method="dialog" id="shipmentForm">
+      <div class="modal-head">
+        <h3>收货/出货登记</h3>
+        <button type="button" class="icon-btn" data-close="shipmentDialog">×</button>
+      </div>
+      <div class="form-grid">
+        <label>录单日期<input name="date" type="date" required></label>
+        <label>渠道<input name="channel" list="channelList" required></label>
+        <label>客户单位<input name="customer" list="customerList" required></label>
+        <label>客户地址<input name="customerAddress"></label>
+        <label>收货人电话<input name="receiverPhone"></label>
+        <label>入仓号/唛头<input name="mark" list="markList"></label>
+        <label>品名<input name="description" list="descriptionList"></label>
+        <label>主单号<input name="masterNo" list="masterNoList"></label>
+        <label>运单号<input name="waybill" required></label>
+        <label>始发地<input name="origin" list="originList"></label>
+        <label>目的地<input name="destination" list="destinationList"></label>
+        <label>业务类型<input name="mode" list="modeList"></label>
+        <label>件数<input name="ctn" type="number" step="1" min="0"></label>
+        <label>实重<input name="weight" type="number" step="0.01" min="0"></label>
+        <label>体积重<input name="volumeWeight" type="number" step="0.01" min="0"></label>
+        <label>计费重量<input name="chargeWeight" type="number" step="0.01" min="0" required></label>
+        <label>货值<input name="cargoValue" type="number" step="0.01" min="0"></label>
+        <label>业务员<input name="salesPerson" list="paymentSalesList" placeholder="例如：TERRY"></label>
+        <label>货物状态<input name="shipmentStatus" list="shipmentStatusList"></label>
+        <label>航班/船名<input name="flightNo" list="flightNoList"></label>
+        <label>清关状态<select name="customsStatus"><option>未开始</option><option>资料待补</option><option>清关中</option><option>已放行</option><option>异常</option></select></label>
+        <label>末端派送商<input name="lastMile" list="lastMileList"></label>
+        <label>预计出发<span class="date-field"><input name="etd" type="date" data-date-placeholder="yyyy/mm/dd"></span></label>
+        <label>预计到达<span class="date-field"><input name="eta" type="date" data-date-placeholder="yyyy/mm/dd"></span></label>
+        <label>派送日期<span class="date-field"><input name="deliveryDate" type="date" data-date-placeholder="yyyy/mm/dd"></span></label>
+        <label>结算方式<input name="terms" list="termsList"></label>
+        <label>成本结算状态<select name="costStatus"><option>未结算N/P</option><option>已结算PAID</option><option>部分结算</option><option>无需结算</option></select></label>
+        <label>AED汇率<input name="aedRate" type="number" step="0.0001" min="0"></label>
+        <label>USD汇率<input name="usdRate" type="number" step="0.0001" min="0"></label>
+        <label class="wide">备注<input name="note"></label>
+      </div>
+      <details class="detail-section">
+        <summary>货物明细</summary>
+        <div class="detail-actions">
+          <button type="button" class="secondary-btn small" id="exportCargoPdfBtn">导出入仓纸PDF</button>
+          <button type="button" class="secondary-btn small" id="exportCargoExcelBtn">导出入仓纸Excel</button>
+        </div>
+        <div class="form-grid detail-grid">
+          <label>入仓单号/编码序列号<input name="cargoEntryNo"></label>
+          <label>品名<input name="cargoName" list="descriptionList"></label>
+          <label>收货方式<select name="receivingMethod"><option></option><option>快递</option><option>货拉拉</option><option>自送</option><option>其他投递</option></select></label>
+          <label>快递单号/车牌号<input name="receivingReference"></label>
+          <label>司机/联系方式<input name="driverContact"></label>
+          <label>产品性质<select name="productNature"><option></option><option>无牌普货</option><option>有品牌</option><option>带电</option><option>粉末</option><option>液体</option><option>敏感物</option><option>其他</option></select></label>
+          <label class="wide">备注<input name="cargoDetailNote"></label>
+          <details class="wide cargo-size-section">
+            <summary>箱规明细</summary>
+            <div class="cargo-size-table">
+              <div class="cargo-size-head">
+                <span>箱号</span><span>品名</span><span>件数</span><span>长(cm)</span><span>宽(cm)</span><span>高(cm)</span><span>体积重</span><span></span>
+              </div>
+              <div id="cargoLinesBody"></div>
+              <div class="cargo-total-row">
+                <strong>TOTAL</strong>
+                <span>总件数：<b id="cargoTotalCtn">0</b></span>
+                <span>实际重：<b id="cargoTotalActual">0.00</b></span>
+                <span>体积重：<b id="cargoTotalVolume">0.00</b></span>
+                <span>计费重：<b id="cargoTotalCharge">0.00</b></span>
+                <label class="bubble-mode">计泡<select name="bubbleMode"><option value="full">收全泡</option><option value="1/2">收1/2泡</option><option value="1/3">收1/3泡</option><option value="2/3">收2/3泡</option></select></label>
+              </div>
+              <div class="cargo-size-foot">
+                <span>体积重会按每行尺寸自动计算</span>
+                <button type="button" class="icon-add-btn" id="addCargoLineBtn">+</button>
+              </div>
+              <input name="cartonSize" type="hidden">
+              <input name="cargoLinesJson" type="hidden">
+              <input name="cargoCtn" type="hidden">
+              <input name="cargoVolumeWeight" type="hidden">
+            </div>
+          </details>
+        </div>
+      </details>
+      <section class="cost-section receivable-section">
+        <div class="cost-head">
+          <h4>应收收费项目</h4>
+          <span>这里填写要向客户收取的附加费用，会显示在派送单和客户账单里。</span>
+        </div>
+        <div class="cost-grid">
+          <label>卖价<span class="money-field"><input name="unitPrice" type="number" step="0.01" min="0"><select name="unitPriceCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label>保险费<span class="money-field"><input name="chargeInsurance" type="number" step="0.01" min="0"><select name="chargeInsuranceCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label>提货费<span class="money-field"><input name="chargePickup" type="number" step="0.01" min="0"><select name="chargePickupCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label>派送费<span class="money-field"><input name="chargeDelivery" type="number" step="0.01" min="0"><select name="chargeDeliveryCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label>文件费<span class="money-field"><input name="chargeDocument" type="number" step="0.01" min="0"><select name="chargeDocumentCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label>登记费<span class="money-field"><input name="chargeRegistration" type="number" step="0.01" min="0"><select name="chargeRegistrationCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label>清关费<span class="money-field"><input name="chargeCustoms" type="number" step="0.01" min="0"><select name="chargeCustomsCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label>仓储费<span class="money-field"><input name="chargeStorage" type="number" step="0.01" min="0"><select name="chargeStorageCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label>其他应收<span class="money-field"><input name="chargeOther" type="number" step="0.01" min="0"><select name="chargeOtherCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label class="cost-note">应收备注<input name="chargeNote"></label>
+        </div>
+      </section>
+      <section class="cost-section">
+        <div class="cost-head">
+          <h4>成本明细</h4>
+          <span>运费按单价 × 计费重计算，其他成本按金额直接计入。</span>
+        </div>
+        <div class="cost-grid">
+          <label>运费单价<span class="money-field"><input name="costFreight" type="number" step="0.01" min="0"><select name="costFreightCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label>提货费<span class="money-field"><input name="costPickup" type="number" step="0.01" min="0"><select name="costPickupCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label>派送费<span class="money-field"><input name="costDelivery" type="number" step="0.01" min="0"><select name="costDeliveryCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label>文件费<span class="money-field"><input name="costDocument" type="number" step="0.01" min="0"><select name="costDocumentCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label>登记费<span class="money-field"><input name="costRegistration" type="number" step="0.01" min="0"><select name="costRegistrationCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label>清关费<span class="money-field"><input name="costCustoms" type="number" step="0.01" min="0"><select name="costCustomsCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label>仓储费<span class="money-field"><input name="costStorage" type="number" step="0.01" min="0"><select name="costStorageCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label>操作费<span class="money-field"><input name="costHandling" type="number" step="0.01" min="0"><select name="costHandlingCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label>保险费<span class="money-field"><input name="costInsurance" type="number" step="0.01" min="0"><select name="costInsuranceCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label>其他费用<span class="money-field"><input name="costOther" type="number" step="0.01" min="0"><select name="costOtherCurrency"><option>RMB</option><option>AED</option><option>USD</option></select></span></label>
+          <label class="cost-note">成本备注<input name="costNote"></label>
+        </div>
+        <div class="cost-summary-box">
+          <span>成本汇总</span>
+          <strong id="shipmentCostSummary">0.00</strong>
+        </div>
+      </section>
+      <input name="id" type="hidden">
+      <div class="modal-actions">
+        <button type="button" class="secondary-btn" data-close="shipmentDialog">取消</button>
+        <button class="primary-btn" type="submit">保存登记</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="paymentDialog" class="modal">
+    <form method="dialog" id="paymentForm">
+      <div class="modal-head">
+        <h3>回款核销</h3>
+        <button type="button" class="icon-btn" data-close="paymentDialog">×</button>
+      </div>
+      <div class="form-grid">
+        <label>回款日期<input name="date" type="date" required></label>
+        <label>客户单位<input name="customer" list="customerList" required></label>
+        <label>运单号/主单号<input name="waybill" list="waybillList"></label>
+        <label>业务员<input name="account" list="paymentSalesList" placeholder="例如：TERRY/BINGO"></label>
+        <label>币种<select name="currency"><option>RMB</option><option>AED</option><option>USD</option><option>SAR</option></select></label>
+        <label>回款金额<input name="amount" type="number" step="0.01" min="0" required></label>
+        <label>汇率<input name="rate" type="number" step="0.0001" min="0" value="1"></label>
+        <label>收款账户<input name="receiveAccount" list="paymentAccountList" placeholder="例如：公司公账"></label>
+        <label>核销方式<select name="method"><option>按运单核销</option><option>按客户预收/批量核销</option><option>退款/冲销</option><option>其他</option></select></label>
+        <label>备注<input name="note"></label>
+      </div>
+      <input name="id" type="hidden">
+      <div class="modal-actions">
+        <button type="button" class="secondary-btn" data-close="paymentDialog">取消</button>
+        <button class="primary-btn" type="submit">保存回款</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="customerDialog" class="modal">
+    <form method="dialog" id="customerForm">
+      <div class="modal-head">
+        <h3>客户资料</h3>
+        <button type="button" class="icon-btn" data-close="customerDialog">×</button>
+      </div>
+      <div class="form-grid">
+        <label>唛头<input name="mark"></label>
+        <label>发货人<input name="shipper"></label>
+        <label>发货人电话<input name="shipperPhone"></label>
+        <label>收货人<input name="receiver"></label>
+        <label>收货人电话<input name="receiverPhone"></label>
+        <label class="wide">地址/备注<input name="address"></label>
+      </div>
+      <input name="id" type="hidden">
+      <div class="modal-actions">
+        <button type="button" class="secondary-btn" data-close="customerDialog">取消</button>
+        <button class="primary-btn" type="submit">保存客户</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="statementDialog" class="modal statement-modal">
+    <form method="dialog" id="statementForm">
+      <div class="modal-head">
+        <h3>客户月度账单</h3>
+        <button type="button" class="icon-btn" data-close="statementDialog">×</button>
+      </div>
+      <div class="form-grid statement-grid">
+        <label>客户单位<input name="customer" list="customerList" required></label>
+        <label>账单月份<input name="month" type="month" required></label>
+        <label>目的地<input name="destination" list="destinationList" placeholder="例如：DXB"></label>
+        <label>航线<input name="route" placeholder="例如：CN-DXB/KSA"></label>
+        <label>制单日期<input name="issueDate" type="date" required></label>
+        <label>账单标题<select name="titleType"><option value="air">空运费账单</option><option value="sea">海运费账单</option><option value="mixed">物流费用账单</option></select></label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="secondary-btn" data-close="statementDialog">取消</button>
+        <button type="button" class="secondary-btn" id="exportStatementExcelBtn">导出Excel</button>
+        <button type="button" class="primary-btn" id="exportStatementPdfBtn">导出PDF</button>
+      </div>
+    </form>
+  </dialog>
+
+  <datalist id="channelList"></datalist>
+  <datalist id="customerList"></datalist>
+  <datalist id="markList"></datalist>
+  <datalist id="originList"></datalist>
+  <datalist id="destinationList"></datalist>
+  <datalist id="modeList"></datalist>
+  <datalist id="termsList"></datalist>
+  <datalist id="shipmentStatusList"></datalist>
+  <datalist id="waybillList"></datalist>
+  <datalist id="masterNoList"></datalist>
+  <datalist id="descriptionList"></datalist>
+  <datalist id="flightNoList"></datalist>
+  <datalist id="lastMileList"></datalist>
+  <datalist id="paymentAccountList"></datalist>
+  <datalist id="paymentSalesList"></datalist>
+
+  <script src="logo-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
