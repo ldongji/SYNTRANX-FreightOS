@@ -4136,9 +4136,10 @@ function statementHtml(statement, mode = "print") {
       <div>Bank Name: Abu Dhabi Commercial Bank (ADCB)</div>
       <div>Branch Add: Deira Branch Dubai United Arab Emirates</div>
     ` : `
+      <div>收款只接收账号公账对公账，私账汇款请索要私账账号：</div>
       <div>户名：广州市新创供应链管理有限公司</div>
       <div>账号：3602 2266 0900 0109 645</div>
-      <div>开户行：广州开发区分行 /广州经济技术开发区支行</div>
+      <div>开户行：工商银行广州开发区分行 /广州经济技术开发区支行</div>
       <div>行号：102581000177</div>
     `;
   const emptyRow = `<tr><td colspan="10" class="empty-line">该客户单位本月暂无账单明细</td></tr>`;
@@ -4976,7 +4977,6 @@ function customerLedgerDirectoryHtml(mode = "print") {
           <td>${escapeHtml((row.currencies || ["RMB"]).join(" / "))}</td>
           <td class="money">${money(row.paid)}</td>
           <td class="money">${money(row.open)}</td>
-          <td>${escapeHtml(riskLevel(row))}</td>
           <td>${escapeHtml(row.lastDate)}</td>
         </tr>
   `).join("");
@@ -5005,8 +5005,7 @@ function customerLedgerDirectoryHtml(mode = "print") {
     th:nth-child(5), td:nth-child(5),
     th:nth-child(6), td:nth-child(6) { width: 13%; }
     th:nth-child(4), td:nth-child(4) { width: 10%; }
-    th:nth-child(7), td:nth-child(7) { width: 10%; }
-    th:nth-child(8), td:nth-child(8) { width: 11%; }
+    th:nth-child(7), td:nth-child(7) { width: 11%; }
     td.money { text-align: right; font-variant-numeric: tabular-nums; }
     tfoot td { font-weight: 800; background: #f8fafc; }
     .toolbar { position: fixed; right: 18px; top: 18px; display: flex; gap: 8px; }
@@ -5037,11 +5036,10 @@ function customerLedgerDirectoryHtml(mode = "print") {
           <th>应收币种</th>
           <th>已核销</th>
           <th>未收</th>
-          <th>风险等级</th>
           <th>最后业务日期</th>
         </tr>
       </thead>
-      <tbody>${bodyRows || `<tr><td colspan="8">暂无客户单位账款数据</td></tr>`}</tbody>
+      <tbody>${bodyRows || `<tr><td colspan="7">暂无客户单位账款数据</td></tr>`}</tbody>
       <tfoot>
         <tr>
           <td>合计</td>
@@ -5050,7 +5048,6 @@ function customerLedgerDirectoryHtml(mode = "print") {
           <td></td>
           <td class="money">${money(total.paid)}</td>
           <td class="money">${money(total.open)}</td>
-          <td></td>
           <td></td>
         </tr>
       </tfoot>
@@ -5063,25 +5060,27 @@ function customerLedgerDirectoryHtml(mode = "print") {
 function selectedCustomerLedgerDirectoryHtml(mode = "print") {
   const customer = selectedCustomerDetail || document.querySelector("#customerSearch")?.value.trim();
   if (!customer) return customerLedgerDirectoryHtml(mode);
-  const summary = customerSummary().find((item) => item.customer === customer);
   const detailRows = customerDetailRows(customer);
   const detailTotal = detailRows.reduce((acc, row) => {
     acc.ctn += number(row.ctn);
     acc.weight += number(row.weight);
     acc.volumeWeight += number(row.volumeWeight);
+    acc.chargeWeight += number(row.chargeWeight);
     acc.receivable += number(row.shouldReceive);
     acc.paid += number(row.paid);
     acc.open += number(row.open);
+    acc.currencies = unique([...acc.currencies, ...receivableCurrenciesForShipment(row)]);
+    acc.lastDate = acc.lastDate && acc.lastDate > row.date ? acc.lastDate : row.date;
     return acc;
-  }, { ctn: 0, weight: 0, volumeWeight: 0, receivable: 0, paid: 0, open: 0 });
-  const summaryRow = summary || {
+  }, { ctn: 0, weight: 0, volumeWeight: 0, chargeWeight: 0, receivable: 0, paid: 0, open: 0, currencies: [], lastDate: "" });
+  const summaryRow = {
     customer,
     count: detailRows.length,
     receivable: detailTotal.receivable,
-    currencies: ["RMB"],
+    currencies: detailTotal.currencies.length ? detailTotal.currencies : ["RMB"],
     paid: detailTotal.paid,
     open: detailTotal.open,
-    lastDate: detailRows[0]?.date || "",
+    lastDate: detailTotal.lastDate,
   };
   const detailBody = detailRows.map((row) => `
         <tr>
@@ -5169,7 +5168,6 @@ function selectedCustomerLedgerDirectoryHtml(mode = "print") {
           <th>应收币种</th>
           <th>已核销</th>
           <th>未收</th>
-          <th>风险等级</th>
           <th>最后业务日期</th>
         </tr>
       </thead>
@@ -5181,7 +5179,6 @@ function selectedCustomerLedgerDirectoryHtml(mode = "print") {
           <td>${escapeHtml((summaryRow.currencies || ["RMB"]).join(" / "))}</td>
           <td class="number">${money(summaryRow.paid)}</td>
           <td class="number">${money(summaryRow.open)}</td>
-          <td>${escapeHtml(riskLevel(summaryRow))}</td>
           <td>${escapeHtml(summaryRow.lastDate || "")}</td>
         </tr>
       </tbody>
@@ -5213,7 +5210,7 @@ function selectedCustomerLedgerDirectoryHtml(mode = "print") {
           <td class="number">${detailTotal.ctn || ""}</td>
           <td class="number">${money(detailTotal.weight)}</td>
           <td class="number">${money(detailTotal.volumeWeight)}</td>
-          <td></td>
+          <td class="number">${money(detailTotal.chargeWeight)}</td>
           <td></td>
           <td class="number">${money(detailTotal.receivable)}</td>
           <td class="number">${money(detailTotal.paid)}</td>

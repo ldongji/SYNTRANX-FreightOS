@@ -1999,9 +1999,17 @@ textarea[required]::placeholder {
   padding-top: 12px;
 }
 
-.detail-section summary {
+.detail-tabs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.detail-tab {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-height: 36px;
   padding: 7px 12px;
   border: 1px solid var(--line);
@@ -2012,6 +2020,12 @@ textarea[required]::placeholder {
   font-weight: 800;
   cursor: pointer;
   user-select: none;
+}
+
+.detail-tab.active {
+  background: rgba(15, 107, 92, 0.1);
+  border-color: var(--brand);
+  color: var(--brand);
 }
 
 .detail-grid {
@@ -2085,33 +2099,10 @@ textarea[required]::placeholder {
 
 .detail-actions {
   display: inline-flex;
-  width: calc(100% - 108px);
-  vertical-align: top;
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
-  margin-top: 0;
-  margin-left: 10px;
-}
-
-#shipmentDetailTrackBtn,
-#shipmentDetailPodBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 36px;
-  padding: 7px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #f8fafc;
-  color: var(--brand-dark);
-  font-size: 13px;
-  font-weight: 800;
-  box-shadow: none;
-}
-
-#shipmentDetailPodBtn {
-  margin-right: auto;
+  margin-left: auto;
 }
 
 .cargo-line-row + .cargo-line-row {

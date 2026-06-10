@@ -965,13 +965,15 @@
         <label>USD汇率<input name="usdRate" type="number" step="0.0001" min="0"></label>
         <label class="wide">备注<input name="note"></label>
       </div>
-      <details class="detail-section">
-        <summary>货物明细</summary>
-        <div class="detail-actions">
-          <button type="button" class="secondary-btn small" id="shipmentDetailTrackBtn">轨迹</button>
-          <button type="button" class="secondary-btn small" id="shipmentDetailPodBtn">签收单</button>
-          <button type="button" class="secondary-btn small" id="exportCargoPdfBtn">导出入仓纸PDF</button>
-          <button type="button" class="secondary-btn small" id="exportCargoExcelBtn">导出入仓纸Excel</button>
+      <section class="detail-section">
+        <div class="detail-tabs" role="tablist" aria-label="详细录入附加信息">
+          <button type="button" class="detail-tab active" aria-selected="true">货物明细</button>
+          <button type="button" class="detail-tab" id="shipmentDetailTrackBtn">轨迹</button>
+          <button type="button" class="detail-tab" id="shipmentDetailPodBtn">签收单</button>
+          <div class="detail-actions">
+            <button type="button" class="secondary-btn small" id="exportCargoPdfBtn">导出入仓纸PDF</button>
+            <button type="button" class="secondary-btn small" id="exportCargoExcelBtn">导出入仓纸Excel</button>
+          </div>
         </div>
         <div class="form-grid detail-grid">
           <label>入仓单号/编码序列号<input name="cargoEntryNo"></label>
@@ -1008,7 +1010,7 @@
             </div>
           </details>
         </div>
-      </details>
+      </section>
       <section class="cost-section receivable-section">
         <div class="cost-head">
           <h4>卖价/应收明细</h4>
