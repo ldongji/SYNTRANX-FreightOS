@@ -13,7 +13,7 @@
         <span></span>
       </button>
       <div class="brand">
-        <div class="brand-mark">新创</div>
+        <div class="brand-mark brand-logo-wrap"><img src="assets/syntranx-logo-cropped.png" alt="SYNTRANX Logistics logo"></div>
         <div>
           <h1>跨境物流系统</h1>
           <p>TMS · 财务 · 客户单位</p>
@@ -34,7 +34,7 @@
           <div class="nav-sub"><button data-jump="operations" data-i18n="nav.inbound">入仓</button><button data-jump="operations" data-i18n="nav.outbound">出仓</button><button data-jump="operations" data-i18n="nav.customs">清关</button><button data-jump="operations" data-i18n="nav.delivery">派送</button><button data-jump="operations" data-i18n="nav.pod">签收</button><button data-jump="operations" data-i18n="nav.exceptions">异常件</button></div>
         </div>
         <div class="nav-group">
-          <button class="nav-item" data-view="customers"><span class="nav-icon">👥</span><span data-i18n="nav.customerMgmt">客户管理</span></button>
+          <button class="nav-item" data-view="customers"><span class="nav-icon">👥</span><span data-i18n="nav.customerMgmt">客户信用管理</span></button>
           <div class="nav-sub"><button data-jump="settings" data-i18n="nav.customerProfiles">客户档案</button><button data-jump="customers" data-i18n="nav.customerLedger">客户总账</button><button data-jump="customers" data-i18n="nav.receivables">应收账款</button><button data-jump="aging" data-i18n="nav.agingAnalysis">账龄分析</button><button data-jump="riskCustomers" data-i18n="nav.riskCustomers">风险客户</button></div>
         </div>
         <div class="nav-group">
@@ -527,6 +527,7 @@
                 <th>核销RMB</th>
                 <th>收款账户</th>
                 <th>方式</th>
+                <th>凭证/备注</th>
                 <th></th>
               </tr>
             </thead>
@@ -565,6 +566,22 @@
           </div>
         </div>
         <div class="customer-upgrade-grid" id="customerUpgradeCards"></div>
+        <section class="panel credit-policy-panel">
+          <div class="panel-head">
+            <div>
+              <h3>客户信用管理</h3>
+              <p class="form-hint">按客户自动计算信用额度占用、账期剩余天数与风险提示；可在下方表格预览客户账单并执行催收。</p>
+            </div>
+          </div>
+          <div class="table-wrap compact">
+            <table class="data-table credit-table">
+              <thead>
+                <tr><th>客户单位</th><th>信用额度</th><th>额度占用</th><th>账期</th><th>超期天数</th><th>风险提示</th><th>建议动作</th></tr>
+              </thead>
+              <tbody id="creditRows"></tbody>
+            </table>
+          </div>
+        </section>
         <div class="customer-section-head">
           <h3>未完成结算客户单位</h3>
           <p class="form-hint">升级版客户中心：汇总账龄、收款率、风险与毛利，支持直接预览客户账单明细。</p>
