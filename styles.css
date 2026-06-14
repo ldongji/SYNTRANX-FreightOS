@@ -2634,3 +2634,165 @@ textarea[required]::placeholder {
     flex-direction: column;
   }
 }
+
+/* Freight OS 3.2 module navigation and booking management */
+.module-nav {
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.nav-group {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+.nav-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+}
+
+.nav-icon {
+  width: 22px;
+  text-align: center;
+  flex: 0 0 22px;
+}
+
+.nav-sub {
+  display: grid;
+  gap: 2px;
+  padding: 0 8px 8px 40px;
+}
+
+.nav-sub button {
+  border: 0;
+  background: transparent;
+  color: #b7c2ce;
+  text-align: left;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.nav-sub button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.language-select {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #fff;
+  font-weight: 700;
+}
+
+.app-shell.sidebar-collapsed .nav-sub,
+.app-shell.sidebar-collapsed .nav-item span:not(.nav-icon) {
+  display: none;
+}
+
+.app-shell.sidebar-collapsed .nav-item {
+  justify-content: center;
+}
+
+.app-shell.sidebar-collapsed .nav-item::before {
+  content: none;
+}
+
+.booking-summary.kpi-grid {
+  grid-template-columns: repeat(6, minmax(130px, 1fr));
+}
+
+.booking-status-board {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(110px, 1fr));
+  gap: 10px;
+  margin: 12px 0 18px;
+}
+
+.booking-status-board article {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--brand);
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
+}
+
+.booking-status-board span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.booking-status-board strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 24px;
+}
+
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 12px;
+  margin: 18px 0 10px;
+}
+
+.section-title h4,
+.section-title p {
+  margin: 0;
+}
+
+.section-title p {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.rate-panel {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.rate-grid {
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
+}
+
+.booking-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-width: 160px;
+}
+
+.booking-actions button {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fff;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.booking-actions .danger-action {
+  color: var(--danger);
+}
+
+@media (max-width: 1200px) {
+  .booking-summary.kpi-grid,
+  .booking-status-board,
+  .rate-grid {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+}

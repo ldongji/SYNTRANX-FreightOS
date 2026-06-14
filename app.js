@@ -1,5 +1,8 @@
 const STORAGE_KEY = "xc_shipping_receivables_v1";
 const UI_STORAGE_KEY = "xc_shipping_ui_v1";
+const LANGUAGE_STORAGE_KEY = "xc_freightos_language_v1";
+const BOOKING_STATUS_FLOW = ["待询价", "待订舱", "已订舱", "已放舱", "已起飞", "已到港", "已取消"];
+let currentLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY) || "zh";
 
 const SHIPMENT_STATUS_OPTIONS = ["新货入仓", "已出仓", "转运中", "到达目的", "清关中", "分拣中", "派送中", "已签收"];
 const ORIGIN_OPERATION_STATUSES = ["新货入仓", "已出仓", "转运中", "到达目的"];
@@ -244,6 +247,14 @@ const els = {
   bookingCtn: document.querySelector("#bookingCtn"),
   bookingWeight: document.querySelector("#bookingWeight"),
   bookingProfit: document.querySelector("#bookingProfit"),
+  bookingTodayCount: document.querySelector("#bookingTodayCount"),
+  bookingWeekCount: document.querySelector("#bookingWeekCount"),
+  bookingPendingCount: document.querySelector("#bookingPendingCount"),
+  bookingReleasedCount: document.querySelector("#bookingReleasedCount"),
+  bookingDepartedCount: document.querySelector("#bookingDepartedCount"),
+  bookingStatusBoard: document.querySelector("#bookingStatusBoard"),
+  bookingTableHead: document.querySelector("#bookingTableHead"),
+  languageSelect: document.querySelector("#languageSelect"),
   paymentRows: document.querySelector("#paymentRows"),
   customerRows: document.querySelector("#customerRows"),
   completedCustomerRows: document.querySelector("#completedCustomerRows"),
@@ -1678,6 +1689,35 @@ function exportManifestPdf() {
   printWindow.document.close();
 }
 
+
+const i18n = {
+  zh: {
+    "nav.dashboard":"老板驾驶舱","nav.overview":"经营总览","nav.aging":"账龄结构","nav.riskCustomers":"风险客户","nav.profitRank":"利润排行","nav.opsAlerts":"运营预警","nav.business":"业务管理","nav.shipments":"运单管理","nav.booking":"订舱管理","nav.customerBills":"客户账单","nav.transport":"运输操作","nav.inbound":"入仓","nav.outbound":"出仓","nav.customs":"清关","nav.delivery":"派送","nav.pod":"签收","nav.exceptions":"异常件","nav.customerMgmt":"客户管理","nav.customerProfiles":"客户档案","nav.customerLedger":"客户总账","nav.receivables":"应收账款","nav.agingAnalysis":"账龄分析","nav.financeCenter":"财务中心","nav.paymentApply":"回款核销","nav.expenseMgmt":"费用管理","nav.profitAnalysis":"利润分析","nav.accountFlow":"账户流水","nav.reports":"报表中心","nav.shipmentReport":"运单报表","nav.customerReport":"客户报表","nav.financeReport":"财务报表","nav.agingReport":"账龄报表","nav.profitReport":"利润报表","nav.settings":"系统设置","nav.customerData":"客户资料","nav.channelMgmt":"渠道管理","nav.destinationMgmt":"目的地管理","nav.productMgmt":"运输产品管理","nav.airlineMgmt":"航空公司管理","nav.deliveryVendorMgmt":"派送商管理","nav.bankSettings":"银行账户设置",
+    "btn.exportAll":"导出全部数据","btn.clearLocal":"清空本机数据","btn.importCsv":"导入登记CSV","btn.exportStatement":"导出账单","btn.newShipment":"新增业务","btn.newPayment":"登记回款","btn.saveBooking":"保存订舱","btn.edit":"改","btn.delete":"删","booking.title":"订舱管理","booking.subtitle":"订舱资料、舱位状态、预估应收应付与运价入口统一管理。","booking.rateEntry":"运价管理入口","booking.kpiToday":"今日订舱票数","booking.kpiWeek":"本周订舱票数","booking.kpiPending":"待确认订舱","booking.kpiReleased":"已放舱","booking.kpiDeparted":"已起飞","booking.kpiProfit":"预计毛利","booking.quickForm":"快速订舱表单","booking.records":"订舱记录表","booking.rateTitle":"运价管理入口","booking.rateHint":"当前 Sprint 仅提供基础结构，后续可扩展为报价系统。","booking.empty":"暂无订舱记录",
+    "field.bookingDate":"订舱日期","field.customer":"客户单位","field.airline":"航空公司","field.agent":"订舱代理","field.flightNo":"航班号","field.masterNo":"主单号/提单号","field.originAirport":"起飞机场","field.destinationAirport":"目的机场","field.etd":"预计起飞","field.eta":"预计到达","field.ctn":"件数","field.weight":"重量","field.volumeWeight":"体积重","field.receivableEst":"应收预估","field.payableEst":"应付预估","field.profitEst":"毛利预估","field.status":"状态","field.releaseNo":"放舱号","field.sales":"业务员","field.note":"备注","field.unitPrice":"单价","field.currency":"币种","field.validUntil":"有效期","field.actions":"操作"
+  },
+  en: {
+    "nav.dashboard":"Executive Dashboard","nav.overview":"Overview","nav.aging":"Aging Structure","nav.riskCustomers":"Risk Customers","nav.profitRank":"Profit Ranking","nav.opsAlerts":"Ops Alerts","nav.business":"Business Management","nav.shipments":"Shipment Management","nav.booking":"Booking Management","nav.customerBills":"Customer Bills","nav.transport":"Transport Operations","nav.inbound":"Inbound","nav.outbound":"Outbound","nav.customs":"Customs","nav.delivery":"Delivery","nav.pod":"POD","nav.exceptions":"Exceptions","nav.customerMgmt":"Customer Management","nav.customerProfiles":"Customer Profiles","nav.customerLedger":"Customer Ledger","nav.receivables":"Receivables","nav.agingAnalysis":"Aging Analysis","nav.financeCenter":"Finance Center","nav.paymentApply":"Payment Settlement","nav.expenseMgmt":"Expense Management","nav.profitAnalysis":"Profit Analysis","nav.accountFlow":"Account Flow","nav.reports":"Reports","nav.shipmentReport":"Shipment Reports","nav.customerReport":"Customer Reports","nav.financeReport":"Finance Reports","nav.agingReport":"Aging Reports","nav.profitReport":"Profit Reports","nav.settings":"System Settings","nav.customerData":"Customer Data","nav.channelMgmt":"Channel Management","nav.destinationMgmt":"Destination Management","nav.productMgmt":"Transport Products","nav.airlineMgmt":"Airline Management","nav.deliveryVendorMgmt":"Delivery Vendors","nav.bankSettings":"Bank Account Settings",
+    "btn.exportAll":"Export All Data","btn.clearLocal":"Clear Local Data","btn.importCsv":"Import CSV","btn.exportStatement":"Export Statement","btn.newShipment":"New Shipment","btn.newPayment":"New Payment","btn.saveBooking":"Save Booking","btn.edit":"Edit","btn.delete":"Delete","booking.title":"Booking Management","booking.subtitle":"Manage booking data, space status, estimated receivables/payables and rate entry in one place.","booking.rateEntry":"Rate Entry","booking.kpiToday":"Today Bookings","booking.kpiWeek":"This Week Bookings","booking.kpiPending":"Pending Confirmation","booking.kpiReleased":"Space Released","booking.kpiDeparted":"Departed","booking.kpiProfit":"Estimated Gross Profit","booking.quickForm":"Quick Booking Form","booking.records":"Booking Records","booking.rateTitle":"Rate Management Entry","booking.rateHint":"This Sprint provides the base structure only; a quotation system can be added later.","booking.empty":"No booking records",
+    "field.bookingDate":"Booking Date","field.customer":"Customer","field.airline":"Airline","field.agent":"Booking Agent","field.flightNo":"Flight No.","field.masterNo":"MAWB / B/L No.","field.originAirport":"Origin Airport","field.destinationAirport":"Destination Airport","field.etd":"ETD","field.eta":"ETA","field.ctn":"Pieces","field.weight":"Weight","field.volumeWeight":"Volume Weight","field.receivableEst":"Estimated Receivable","field.payableEst":"Estimated Payable","field.profitEst":"Estimated Profit","field.status":"Status","field.releaseNo":"Release No.","field.sales":"Sales","field.note":"Remark","field.unitPrice":"Unit Price","field.currency":"Currency","field.validUntil":"Valid Until","field.actions":"Actions"
+  }
+};
+function t(key) { return i18n[currentLanguage]?.[key] || i18n.zh[key] || key; }
+function bookingStatusLabel(status) {
+  const labels = { en: { "待询价": "Inquiry", "待订舱": "To Book", "已订舱": "Booked", "已放舱": "Released", "已起飞": "Departed", "已到港": "Arrived", "已取消": "Cancelled" } };
+  return labels[currentLanguage]?.[status] || status;
+}
+function applyLanguage() {
+  document.documentElement.lang = currentLanguage === "en" ? "en" : "zh-CN";
+  if (els.languageSelect) els.languageSelect.value = currentLanguage;
+  document.querySelectorAll("[data-i18n]").forEach((node) => { node.textContent = t(node.dataset.i18n); });
+  const activeView = document.querySelector(".view.active")?.id?.replace("View", "") || "dashboard";
+  if (els.viewTitle) {
+    const titleMap = { dashboard: t("nav.dashboard"), aging: t("nav.agingAnalysis"), riskCustomers: t("nav.riskCustomers"), profitRank: t("nav.profitRank"), shipments: t("nav.shipments"), operations: t("nav.transport"), booking: t("nav.booking"), payments: t("nav.paymentApply"), customers: t("nav.customerLedger"), finance: t("nav.expenseMgmt"), accounts: t("nav.accountFlow"), settings: t("nav.settings") };
+    els.viewTitle.textContent = titleMap[activeView] || t("nav.dashboard");
+  }
+}
+
 function exportManifestExcel() {
   const html = manifestReportHtml("excel");
   const blob = new Blob(["\ufeff" + html], { type: "application/vnd.ms-excel;charset=utf-8" });
@@ -1692,40 +1732,38 @@ function exportManifestExcel() {
 function renderBookings() {
   if (!els.bookingRows) return;
   const rows = (state.bookings || []).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const todayText = today();
+  const weekStart = new Date(todayText);
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
   const summary = rows.reduce((acc, booking) => {
-    acc.count += 1;
-    acc.ctn += number(booking.ctn);
-    acc.weight += number(booking.weight);
+    const status = booking.status || "待订舱";
     acc.profit += number(booking.receivable) - number(booking.payable);
+    if (booking.date === todayText) acc.today += 1;
+    if (booking.date && new Date(booking.date) >= weekStart) acc.week += 1;
+    if (["待询价", "待订舱", "已订舱"].includes(status)) acc.pending += 1;
+    if (status === "已放舱") acc.released += 1;
+    if (status === "已起飞") acc.departed += 1;
+    acc.statuses[status] = (acc.statuses[status] || 0) + 1;
     return acc;
-  }, { count: 0, ctn: 0, weight: 0, profit: 0 });
-  if (els.bookingCount) els.bookingCount.textContent = String(summary.count);
-  if (els.bookingCtn) els.bookingCtn.textContent = money(summary.ctn);
-  if (els.bookingWeight) els.bookingWeight.textContent = money(summary.weight);
+  }, { today: 0, week: 0, pending: 0, released: 0, departed: 0, profit: 0, statuses: {} });
+  if (els.bookingTodayCount) els.bookingTodayCount.textContent = String(summary.today);
+  if (els.bookingWeekCount) els.bookingWeekCount.textContent = String(summary.week);
+  if (els.bookingPendingCount) els.bookingPendingCount.textContent = String(summary.pending);
+  if (els.bookingReleasedCount) els.bookingReleasedCount.textContent = String(summary.released);
+  if (els.bookingDepartedCount) els.bookingDepartedCount.textContent = String(summary.departed);
   if (els.bookingProfit) els.bookingProfit.textContent = money(summary.profit);
-  els.bookingRows.innerHTML = rows.length ? rows.map((booking) => `
-    <tr>
-      <td>${escapeHtml(booking.date || "")}</td>
-      <td>${escapeHtml(booking.customer || "")}</td>
-      <td>${escapeHtml(booking.airline || "")}</td>
-      <td>${escapeHtml(booking.agent || "")}</td>
-      <td>${escapeHtml(booking.flightNo || "")}</td>
-      <td>${escapeHtml(booking.masterNo || "")}</td>
-      <td>${escapeHtml(booking.originAirport || "")}</td>
-      <td>${escapeHtml(booking.destinationAirport || "")}</td>
-      <td>${escapeHtml(booking.etd || "")}</td>
-      <td>${escapeHtml(booking.eta || "")}</td>
-      <td class="money">${money(booking.ctn)}</td>
-      <td class="money">${money(booking.weight)}</td>
-      <td class="money">${money(booking.volumeWeight)}</td>
-      <td class="money">${money(booking.receivable)}</td>
-      <td class="money">${money(booking.payable)}</td>
-      <td class="money">${money(number(booking.receivable) - number(booking.payable))}</td>
-      <td><span class="status-chip">${escapeHtml(booking.status || "待订舱")}</span></td>
-      <td>${escapeHtml(booking.note || "")}</td>
-      <td><div class="row-actions small-actions"><button type="button" data-edit-booking="${booking.id}">改</button><button type="button" class="danger-action" data-delete-booking="${booking.id}">删</button></div></td>
-    </tr>
-  `).join("") : `<tr><td colspan="19" class="empty">暂无订舱记录</td></tr>`;
+  if (els.bookingStatusBoard) els.bookingStatusBoard.innerHTML = BOOKING_STATUS_FLOW.map((status) => `<article><span>${escapeHtml(bookingStatusLabel(status))}</span><strong>${summary.statuses[status] || 0}</strong></article>`).join("");
+  if (els.bookingTableHead) {
+    const heads = ["field.bookingDate","field.customer","field.status","field.releaseNo","field.airline","field.flightNo","field.masterNo","field.originAirport","field.destinationAirport","field.etd","field.eta","field.ctn","field.weight","field.volumeWeight","field.profitEst","field.sales","field.note","field.actions"];
+    els.bookingTableHead.innerHTML = heads.map((key) => `<th>${t(key)}</th>`).join("");
+  }
+  els.bookingRows.innerHTML = rows.length ? rows.map((booking) => {
+    const currentIndex = BOOKING_STATUS_FLOW.indexOf(booking.status || "待订舱");
+    const nextStatus = currentIndex >= 0 && currentIndex < BOOKING_STATUS_FLOW.length - 2 ? BOOKING_STATUS_FLOW[currentIndex + 1] : "";
+    return `<tr>
+      <td>${escapeHtml(booking.date || "")}</td><td>${escapeHtml(booking.customer || "")}</td><td><span class="status-chip">${escapeHtml(bookingStatusLabel(booking.status || "待订舱"))}</span></td><td>${escapeHtml(booking.releaseNo || "")}</td><td>${escapeHtml(booking.airline || "")}</td><td>${escapeHtml(booking.flightNo || "")}</td><td>${escapeHtml(booking.masterNo || "")}</td><td>${escapeHtml(booking.originAirport || "")}</td><td>${escapeHtml(booking.destinationAirport || "")}</td><td>${escapeHtml(booking.etd || "")}</td><td>${escapeHtml(booking.eta || "")}</td><td class="money">${money(booking.ctn)}</td><td class="money">${money(booking.weight)}</td><td class="money">${money(booking.volumeWeight)}</td><td class="money">${money(number(booking.receivable) - number(booking.payable))}</td><td>${escapeHtml(booking.sales || "")}</td><td>${escapeHtml(booking.note || "")}</td><td><div class="row-actions booking-actions"><button type="button" data-edit-booking="${booking.id}">${t("btn.edit")}</button>${nextStatus ? `<button type="button" data-advance-booking="${booking.id}">${escapeHtml(bookingStatusLabel(nextStatus))}</button>` : ""}<button type="button" class="danger-action" data-delete-booking="${booking.id}">${t("btn.delete")}</button></div></td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="18" class="empty">${t("booking.empty")}</td></tr>`;
 }
 
 function saveBooking(event) {
@@ -1750,6 +1788,8 @@ function saveBooking(event) {
     receivable: number(data.receivable),
     payable: number(data.payable),
     status: data.status || "待订舱",
+    releaseNo: data.releaseNo || "",
+    sales: data.sales || "",
     note: data.note || "",
   };
   const index = (state.bookings || []).findIndex((item) => item.id === record.id);
@@ -2932,19 +2972,12 @@ function addOption(key, value) {
 
 function switchView(view) {
   const titleMap = {
-    dashboard: "运营总览",
-    shipments: "运单中心",
-    operations: "操作中心",
-    booking: "订舱中心",
-    payments: "财务核销",
-    customers: "应收帐款",
-    finance: "费用报表",
-    accounts: "账户流水",
-    settings: "基础资料",
+    dashboard: t("nav.dashboard"), aging: t("nav.agingAnalysis"), riskCustomers: t("nav.riskCustomers"), profitRank: t("nav.profitRank"),
+    shipments: t("nav.shipments"), operations: t("nav.transport"), booking: t("nav.booking"), payments: t("nav.paymentApply"), customers: t("nav.customerLedger"), finance: t("nav.expenseMgmt"), accounts: t("nav.accountFlow"), settings: t("nav.settings"),
   };
   els.navItems.forEach((btn) => btn.classList.toggle("active", btn.dataset.view === view));
   els.views.forEach((section) => section.classList.toggle("active", section.id === `${view}View`));
-  els.viewTitle.textContent = titleMap[view] || "运营总览";
+  els.viewTitle.textContent = titleMap[view] || t("nav.dashboard");
 }
 
 function formToObject(form) {
@@ -5586,7 +5619,12 @@ function bindEvents() {
     if (side) setOperationSelectAll(side, event.target.checked);
   });
   els.navItems.forEach((btn) => btn.addEventListener("click", () => switchView(btn.dataset.view)));
-  document.querySelectorAll("[data-jump]").forEach((btn) => btn.addEventListener("click", () => switchView(btn.dataset.jump)));
+  document.querySelectorAll("[data-jump]").forEach((btn) => btn.addEventListener("click", () => {
+    const jumpTarget = btn.dataset.jump;
+    const section = document.getElementById(jumpTarget);
+    if (section && !section.classList.contains("view")) section.scrollIntoView({ behavior: "smooth", block: "start" });
+    else switchView(jumpTarget);
+  }));
   document.querySelector("#quickShipmentBtn").addEventListener("click", () => openShipment());
   document.querySelector("#quickPaymentBtn").addEventListener("click", () => openPayment());
   document.querySelector("#statementBtn").addEventListener("click", openStatementDialog);
@@ -5625,6 +5663,9 @@ function bindEvents() {
   els.quickShipmentForm.addEventListener("submit", saveQuickShipment);
   els.quickPaymentForm.addEventListener("submit", saveQuickPayment);
   els.bookingForm?.addEventListener("submit", saveBooking);
+  els.languageSelect?.addEventListener("change", (event) => { currentLanguage = event.target.value; localStorage.setItem(LANGUAGE_STORAGE_KEY, currentLanguage); applyLanguage(); render(); });
+  if (els.bookingForm?.status) els.bookingForm.status.innerHTML = BOOKING_STATUS_FLOW.map((status) => `<option>${status}</option>`).join("");
+  [els.bookingForm?.receivable, els.bookingForm?.payable].forEach((input) => input?.addEventListener("input", () => { if (els.bookingForm.profitPreview) els.bookingForm.profitPreview.value = (number(els.bookingForm.receivable.value) - number(els.bookingForm.payable.value)).toFixed(2); }));
   els.paymentForm.currency.addEventListener("change", () => syncPaymentRate(els.paymentForm));
   els.quickPaymentForm.currency.addEventListener("change", () => syncPaymentRate(els.quickPaymentForm));
   [els.paymentForm, els.quickPaymentForm].forEach((form) => {
@@ -5843,6 +5884,7 @@ function bindEvents() {
     const rejectAccountId = target.dataset.rejectAccount;
     const editBookingId = target.dataset.editBooking;
     const deleteBookingId = target.dataset.deleteBooking;
+    const advanceBookingId = target.dataset.advanceBooking;
     if (podViewId) {
       event.preventDefault();
       event.stopPropagation();
@@ -5861,6 +5903,12 @@ function bindEvents() {
     }
     if (openOperationSide) {
       document.querySelector(`#${openOperationSide}OperationDialog`)?.showModal();
+      return;
+    }
+    if (advanceBookingId) {
+      const booking = (state.bookings || []).find((item) => item.id === advanceBookingId);
+      const currentIndex = BOOKING_STATUS_FLOW.indexOf(booking?.status || "待订舱");
+      if (booking && currentIndex >= 0 && currentIndex < BOOKING_STATUS_FLOW.length - 2) { booking.status = BOOKING_STATUS_FLOW[currentIndex + 1]; saveState(); render(); }
       return;
     }
     if (editBookingId) {
@@ -5932,4 +5980,5 @@ function splitOptions(value) {
 }
 
 bindEvents();
+applyLanguage();
 render();
