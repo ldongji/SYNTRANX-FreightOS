@@ -1,5 +1,16 @@
 const STORAGE_KEY = "xc_shipping_receivables_v1";
 const UI_STORAGE_KEY = "xc_shipping_ui_v1";
+const LANGUAGE_STORAGE_KEY = "xc_freightos_language_v1";
+const BOOKING_STATUS_FLOW = ["待询价", "待订舱", "已订舱", "已放舱", "已起飞", "已到港", "已取消"];
+const WRITE_OFF_ADJUSTMENT_TYPES = [
+  { key: "offsetTail", label: "尾数抹零" },
+  { key: "offsetExchange", label: "汇率差" },
+  { key: "offsetDiscount", label: "客户折扣" },
+  { key: "offsetBadDebt", label: "坏账核销" },
+  { key: "offsetCompensation", label: "赔偿抵扣" },
+  { key: "offsetOther", label: "其他调整" },
+];
+let currentLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY) || "zh";
 
 const SHIPMENT_STATUS_OPTIONS = ["新货入仓", "已出仓", "转运中", "到达目的", "清关中", "分拣中", "派送中", "已签收"];
 const ORIGIN_OPERATION_STATUSES = ["新货入仓", "已出仓", "转运中", "到达目的"];
@@ -244,6 +255,14 @@ const els = {
   bookingCtn: document.querySelector("#bookingCtn"),
   bookingWeight: document.querySelector("#bookingWeight"),
   bookingProfit: document.querySelector("#bookingProfit"),
+  bookingTodayCount: document.querySelector("#bookingTodayCount"),
+  bookingWeekCount: document.querySelector("#bookingWeekCount"),
+  bookingPendingCount: document.querySelector("#bookingPendingCount"),
+  bookingReleasedCount: document.querySelector("#bookingReleasedCount"),
+  bookingDepartedCount: document.querySelector("#bookingDepartedCount"),
+  bookingStatusBoard: document.querySelector("#bookingStatusBoard"),
+  bookingTableHead: document.querySelector("#bookingTableHead"),
+  languageSelect: document.querySelector("#languageSelect"),
   paymentRows: document.querySelector("#paymentRows"),
   customerRows: document.querySelector("#customerRows"),
   completedCustomerRows: document.querySelector("#completedCustomerRows"),
@@ -267,6 +286,8 @@ const els = {
   shipmentProfitRank: document.querySelector("#shipmentProfitRank"),
   customerUpgradeCards: document.querySelector("#customerUpgradeCards"),
   expenseBars: document.querySelector("#expenseBars"),
+  offsetBars: document.querySelector("#offsetBars"),
+  financeOffset: document.querySelector("#financeOffset"),
   opsStages: document.querySelector("#opsStages"),
   shipmentDialog: document.querySelector("#shipmentDialog"),
   trackingDialog: document.querySelector("#trackingDialog"),
@@ -292,6 +313,7 @@ const els = {
   shipmentForm: document.querySelector("#shipmentForm"),
   shipmentReceivableSummary: document.querySelector("#shipmentReceivableSummary"),
   shipmentCostSummary: document.querySelector("#shipmentCostSummary"),
+  shipmentOffsetSummary: document.querySelector("#shipmentOffsetSummary"),
   shipmentProfitSummary: document.querySelector("#shipmentProfitSummary"),
   paymentForm: document.querySelector("#paymentForm"),
   customerForm: document.querySelector("#customerForm"),
@@ -397,13 +419,41 @@ function normalizeShipmentStatusOptions() {
   if (changed) saveState();
 }
 
+function profileCustomerName(profile) {
+  return String(profile?.customerName || profile?.receiver || profile?.shipper || profile?.mark || "").trim();
+}
+
+function normalizeProfileRecord(profile = {}) {
+  const customerName = profileCustomerName(profile);
+  const shortName = String(profile.shortName || profile.mark || customerName || "").trim();
+  return {
+    ...profile,
+    customerName,
+    shortName,
+    contact: profile.contact || profile.shipper || profile.receiver || customerName,
+    phone: profile.phone || profile.receiverPhone || profile.shipperPhone || "",
+    email: profile.email || "",
+    countryRegion: profile.countryRegion || "",
+    customerGrade: ["A", "B", "C", "D"].includes(profile.customerGrade) ? profile.customerGrade : "B",
+    creditLimit: number(profile.creditLimit),
+    creditDays: number(profile.creditDays) || 30,
+    manualRiskLevel: profile.manualRiskLevel || profile.riskLevel || "正常",
+    holdShipment: profile.holdShipment === true || profile.holdShipment === "1" || profile.holdShipment === "on",
+    mark: profile.mark || shortName,
+    shipper: profile.shipper || customerName,
+    receiver: profile.receiver || customerName,
+    shipperPhone: profile.shipperPhone || profile.phone || "",
+    receiverPhone: profile.receiverPhone || profile.phone || "",
+    address: profile.address || "",
+  };
+}
+
 function normalizeProfiles() {
   let changed = false;
-  state.profiles.forEach((profile) => {
-    if (!profile.shipper && profile.receiver) {
-      profile.shipper = profile.receiver;
-      changed = true;
-    }
+  state.profiles = state.profiles.map((profile) => {
+    const normalized = normalizeProfileRecord(profile);
+    if (JSON.stringify(normalized) !== JSON.stringify(profile)) changed = true;
+    return normalized;
   });
   if (changed) saveState();
 }
@@ -487,6 +537,7 @@ function moneyFieldDefaults() {
     aedRate: number(rates.AED) || 1.84,
     usdRate: number(rates.USD) || 6.8,
     ...Object.fromEntries(MONEY_KEYS.map((key) => [`${key}Currency`, "RMB"])),
+    ...Object.fromEntries(WRITE_OFF_ADJUSTMENT_TYPES.map((item) => [`${item.key}Currency`, "RMB"])),
   };
 }
 
@@ -692,8 +743,10 @@ function updateShipmentCostSummary() {
   const data = formToObject(els.shipmentForm);
   const receivableTotal = receivable(data);
   const costTotal = cost(data);
+  const offsetTotal = writeOffAdjustmentRmb(data);
   const profitTotal = receivableTotal - costTotal;
   if (els.shipmentReceivableSummary) els.shipmentReceivableSummary.textContent = money(receivableTotal);
+  if (els.shipmentOffsetSummary) els.shipmentOffsetSummary.textContent = money(offsetTotal);
   if (els.shipmentCostSummary) els.shipmentCostSummary.textContent = money(costTotal);
   if (els.shipmentProfitSummary) {
     els.shipmentProfitSummary.textContent = money(profitTotal);
@@ -849,6 +902,27 @@ function matchesShipmentReference(reference, shipment) {
   return [shipment.waybill, shipment.masterNo].some((value) => normalizeReference(value) === target);
 }
 
+function writeOffAdjustmentRmb(shipment) {
+  return WRITE_OFF_ADJUSTMENT_TYPES.reduce((sum, item) => sum + amountInRmb(shipment, item.key), 0);
+}
+
+function writeOffAdjustmentBreakdown(shipment) {
+  return WRITE_OFF_ADJUSTMENT_TYPES.map((item) => ({
+    ...item,
+    amount: amountInRmb(shipment, item.key),
+  })).filter((item) => item.amount > 0.009);
+}
+
+function writeOffAdjustmentSummary() {
+  const totals = new Map(WRITE_OFF_ADJUSTMENT_TYPES.map((item) => [item.label, 0]));
+  state.shipments.forEach((shipment) => {
+    writeOffAdjustmentBreakdown(shipment).forEach((item) => {
+      totals.set(item.label, (totals.get(item.label) || 0) + item.amount);
+    });
+  });
+  return [...totals.entries()].map(([category, amount]) => ({ category, amount })).filter((item) => item.amount > 0.009).sort((a, b) => b.amount - a.amount);
+}
+
 function paidForShipment(shipment, ignorePaymentId = "") {
   const byWaybill = state.payments
     .filter((p) => (!ignorePaymentId || p.id !== ignorePaymentId) && matchesShipmentReference(p.waybill, shipment))
@@ -866,10 +940,12 @@ function paidForShipment(shipment, ignorePaymentId = "") {
 function settlement(s, ignorePaymentId = "") {
   const shouldReceive = receivable(s);
   const actualPaid = paidForShipment(s, ignorePaymentId);
+  const writeOffAdjustment = Math.min(shouldReceive, writeOffAdjustmentRmb(s));
   const paid = Math.min(shouldReceive, actualPaid);
-  const open = Math.max(0, shouldReceive - paid);
-  const status = shouldReceive === 0 ? "未付款N/P" : open <= 0.009 ? "已付款PAID" : paid > 0 ? "有余款" : "未付款N/P";
-  return { shouldReceive, paid, actualPaid, open, status, cost: cost(s), profit: shouldReceive - cost(s) };
+  const open = Math.max(0, shouldReceive - paid - writeOffAdjustment);
+  const status = shouldReceive === 0 ? "未付款N/P" : open <= 0.009 ? "已付款PAID" : paid > 0 || writeOffAdjustment > 0 ? "有余款" : "未付款N/P";
+  const originalProfit = shouldReceive - cost(s);
+  return { shouldReceive, paid, actualPaid, writeOffAdjustment, open, status, cost: cost(s), profit: originalProfit, collectibleProfit: originalProfit - writeOffAdjustment };
 }
 
 function receivableCurrenciesForShipment(shipment) {
@@ -908,6 +984,7 @@ function customerSummary() {
       count: 0,
       receivable: 0,
       paid: 0,
+      writeOffAdjustment: 0,
       open: 0,
       currencies: [],
       lastDate: "",
@@ -916,10 +993,25 @@ function customerSummary() {
     current.count += 1;
     current.receivable += st.shouldReceive;
     current.paid += st.paid;
+    current.writeOffAdjustment += st.writeOffAdjustment;
     current.open += st.open;
     current.currencies = unique([...current.currencies, ...receivableCurrenciesForShipment(s)]);
     current.lastDate = current.lastDate && current.lastDate > s.date ? current.lastDate : s.date;
     map.set(s.customer, current);
+  }
+  for (const profile of state.profiles) {
+    const customer = profileCustomerName(profile);
+    if (!customer || map.has(customer)) continue;
+    map.set(customer, {
+      customer,
+      count: 0,
+      receivable: 0,
+      paid: 0,
+      writeOffAdjustment: 0,
+      open: 0,
+      currencies: ["RMB"],
+      lastDate: "",
+    });
   }
   return [...map.values()].sort((a, b) => b.open - a.open);
 }
@@ -930,10 +1022,12 @@ function financeSummary() {
     acc.revenue += st.shouldReceive;
     acc.bizCost += st.cost;
     acc.grossProfit += st.profit;
+    acc.writeOffAdjustment += st.writeOffAdjustment;
+    acc.collectibleProfit += st.collectibleProfit;
     return acc;
-  }, { revenue: 0, bizCost: 0, grossProfit: 0 });
+  }, { revenue: 0, bizCost: 0, grossProfit: 0, writeOffAdjustment: 0, collectibleProfit: 0 });
   const expense = reportExpenseRows().reduce((sum, item) => sum + expenseRmb(item), 0);
-  return { ...biz, expense, netProfit: biz.grossProfit - expense };
+  return { ...biz, expense, netProfit: biz.collectibleProfit - expense };
 }
 
 function expenseSummary() {
@@ -1004,8 +1098,10 @@ function customerPerformanceSummary() {
       count: 0,
       receivable: 0,
       paid: 0,
+      writeOffAdjustment: 0,
       open: 0,
       profit: 0,
+      collectibleProfit: 0,
       maxAgeDays: 0,
       overdueAmount: 0,
       lastDate: "",
@@ -1015,43 +1111,83 @@ function customerPerformanceSummary() {
     current.count += 1;
     current.receivable += st.shouldReceive;
     current.paid += st.paid;
+    current.writeOffAdjustment += st.writeOffAdjustment;
     current.open += st.open;
     current.profit += st.profit;
+    current.collectibleProfit += st.collectibleProfit;
     current.maxAgeDays = Math.max(current.maxAgeDays, ageDays);
     if (ageDays > 30) current.overdueAmount += st.open;
     current.lastDate = current.lastDate && current.lastDate > shipment.date ? current.lastDate : shipment.date;
     current.currencies = unique([...current.currencies, ...receivableCurrenciesForShipment(shipment)]);
     map.set(shipment.customer, current);
   }
+  for (const profile of state.profiles) {
+    const customer = profileCustomerName(profile);
+    if (!customer || map.has(customer)) continue;
+    map.set(customer, { customer, count: 0, receivable: 0, paid: 0, writeOffAdjustment: 0, open: 0, profit: 0, collectibleProfit: 0, maxAgeDays: 0, overdueAmount: 0, lastDate: "", currencies: ["RMB"] });
+  }
   return [...map.values()].map((customer) => ({
     ...customer,
-    collectionRate: customer.receivable > 0 ? customer.paid / customer.receivable : 0,
+    collectionRate: customer.receivable > 0 ? customer.paid / customer.receivable : 1,
   })).sort((a, b) => b.open - a.open);
 }
 
+function profileForCustomerName(customer) {
+  const target = normalizeText(customer);
+  if (!target) return null;
+  return state.profiles.find((profile) => [profile.customerName, profile.shortName, profile.receiver, profile.shipper, profile.mark].some((value) => normalizeText(value) === target)) || null;
+}
+
+function enrichCustomerCredit(row) {
+  const profile = profileForCustomerName(row.customer) || {};
+  const creditLimit = number(profile.creditLimit);
+  const creditDays = number(profile.creditDays) || 30;
+  const availableCredit = creditLimit ? creditLimit - number(row.open) : 0;
+  const manualRiskLevel = profile.manualRiskLevel || "正常";
+  const holdShipment = profile.holdShipment === true || profile.holdShipment === "1" || profile.holdShipment === "on";
+  return { ...row, profile, customerName: profileCustomerName(profile) || row.customer, customerGrade: profile.customerGrade || "B", creditLimit, creditDays, availableCredit, manualRiskLevel, holdShipment };
+}
+
+function customerCreditAssessment(customer) {
+  const perf = customerPerformanceSummary().find((row) => normalizeText(row.customer) === normalizeText(customer)) || { customer, receivable: 0, paid: 0, writeOffAdjustment: 0, open: 0, profit: 0, collectibleProfit: 0, maxAgeDays: 0, collectionRate: 1 };
+  const row = enrichCustomerCredit(perf);
+  const reasons = [];
+  if (row.manualRiskLevel === "黑名单") reasons.push("黑名单");
+  if (row.holdShipment) reasons.push("暂停放货");
+  if (row.creditLimit > 0 && row.open > row.creditLimit) reasons.push("超过信用额度");
+  if (row.maxAgeDays > row.creditDays) reasons.push("账龄逾期");
+  if (row.collectionRate < 0.5 && row.receivable > 0) reasons.push("收款率低于50%");
+  return { ...row, reasons, risky: reasons.length > 0 || ["高风险", "黑名单"].includes(row.manualRiskLevel) };
+}
+
 function enhancedRiskLevel(customer) {
-  if (customer.open <= 0.009) return "正常";
-  if (customer.maxAgeDays > 60 || customer.open >= 50000 || customer.collectionRate < 0.25) return "高风险";
-  if (customer.maxAgeDays > 30 || customer.open >= 10000 || customer.collectionRate < 0.65) return "需跟进";
-  return "低风险";
+  const row = enrichCustomerCredit(customer);
+  if (row.manualRiskLevel === "黑名单") return "黑名单";
+  if (row.holdShipment || row.manualRiskLevel === "高风险") return "高风险";
+  if (row.open <= 0.009) return row.manualRiskLevel === "关注" ? "关注" : "正常";
+  if (row.creditLimit > 0 && row.open > row.creditLimit) return "高风险";
+  if (row.maxAgeDays > row.creditDays * 2) return "高风险";
+  if (row.maxAgeDays > row.creditDays || row.manualRiskLevel === "关注" || row.collectionRate < 0.5) return "关注";
+  return "正常";
 }
 
 function riskSuggestion(customer) {
   const level = enhancedRiskLevel(customer);
+  if (level === "黑名单") return "停止放货并老板复核";
   if (level === "高风险") return "暂停放货/老板确认授信";
-  if (level === "需跟进") return "48小时内催收并复核账单";
+  if (level === "关注") return "48小时内催收并复核账单";
   if (customer.open > 0) return "正常提醒回款";
   return "保持合作";
 }
 
 function customerProfitRanking() {
-  return customerPerformanceSummary().sort((a, b) => b.profit - a.profit);
+  return customerPerformanceSummary().sort((a, b) => b.collectibleProfit - a.collectibleProfit);
 }
 
 function shipmentProfitRanking() {
   return state.shipments
     .map((shipment) => ({ ...shipment, ...settlement(shipment) }))
-    .sort((a, b) => b.profit - a.profit);
+    .sort((a, b) => b.collectibleProfit - a.collectibleProfit);
 }
 
 function percent(value) {
@@ -1678,6 +1814,35 @@ function exportManifestPdf() {
   printWindow.document.close();
 }
 
+
+const i18n = {
+  zh: {
+    "nav.dashboard":"老板驾驶舱","nav.overview":"经营总览","nav.aging":"账龄结构","nav.riskCustomers":"风险客户","nav.profitRank":"利润排行","nav.opsAlerts":"运营预警","nav.business":"业务管理","nav.shipments":"运单管理","nav.booking":"订舱管理","nav.customerBills":"客户账单","nav.transport":"运输操作","nav.inbound":"入仓","nav.outbound":"出仓","nav.customs":"清关","nav.delivery":"派送","nav.pod":"签收","nav.exceptions":"异常件","nav.customerMgmt":"客户管理","nav.customerProfiles":"客户档案","nav.customerLedger":"客户总账","nav.receivables":"应收账款","nav.agingAnalysis":"账龄分析","nav.financeCenter":"财务中心","nav.paymentApply":"回款核销","nav.expenseMgmt":"费用管理","nav.profitAnalysis":"利润分析","nav.accountFlow":"账户流水","nav.reports":"报表中心","nav.shipmentReport":"运单报表","nav.customerReport":"客户报表","nav.financeReport":"财务报表","nav.agingReport":"账龄报表","nav.profitReport":"利润报表","nav.settings":"系统设置","nav.customerData":"客户资料","nav.channelMgmt":"渠道管理","nav.destinationMgmt":"目的地管理","nav.productMgmt":"运输产品管理","nav.airlineMgmt":"航空公司管理","nav.deliveryVendorMgmt":"派送商管理","nav.bankSettings":"银行账户设置",
+    "btn.exportAll":"导出全部数据","btn.clearLocal":"清空本机数据","btn.importCsv":"导入登记CSV","btn.exportStatement":"导出账单","btn.newShipment":"新增业务","btn.newPayment":"登记回款","btn.saveBooking":"保存订舱","btn.edit":"改","btn.delete":"删","booking.title":"订舱管理","booking.subtitle":"订舱资料、舱位状态、预估应收应付与运价入口统一管理。","booking.rateEntry":"运价管理入口","booking.kpiToday":"今日订舱票数","booking.kpiWeek":"本周订舱票数","booking.kpiPending":"待确认订舱","booking.kpiReleased":"已放舱","booking.kpiDeparted":"已起飞","booking.kpiProfit":"预计毛利","booking.quickForm":"快速订舱表单","booking.records":"订舱记录表","booking.rateTitle":"运价管理入口","booking.rateHint":"当前 Sprint 仅提供基础结构，后续可扩展为报价系统。","booking.empty":"暂无订舱记录",
+    "field.bookingDate":"订舱日期","field.customer":"客户单位","field.airline":"航空公司","field.agent":"订舱代理","field.flightNo":"航班号","field.masterNo":"主单号/提单号","field.originAirport":"起飞机场","field.destinationAirport":"目的机场","field.etd":"预计起飞","field.eta":"预计到达","field.ctn":"件数","field.weight":"重量","field.volumeWeight":"体积重","field.receivableEst":"应收预估","field.payableEst":"应付预估","field.profitEst":"毛利预估","field.status":"状态","field.releaseNo":"放舱号","field.sales":"业务员","field.note":"备注","field.unitPrice":"单价","field.currency":"币种","field.validUntil":"有效期","field.actions":"操作"
+  },
+  en: {
+    "nav.dashboard":"Executive Dashboard","nav.overview":"Overview","nav.aging":"Aging Structure","nav.riskCustomers":"Risk Customers","nav.profitRank":"Profit Ranking","nav.opsAlerts":"Ops Alerts","nav.business":"Business Management","nav.shipments":"Shipment Management","nav.booking":"Booking Management","nav.customerBills":"Customer Bills","nav.transport":"Transport Operations","nav.inbound":"Inbound","nav.outbound":"Outbound","nav.customs":"Customs","nav.delivery":"Delivery","nav.pod":"POD","nav.exceptions":"Exceptions","nav.customerMgmt":"Customer Management","nav.customerProfiles":"Customer Profiles","nav.customerLedger":"Customer Ledger","nav.receivables":"Receivables","nav.agingAnalysis":"Aging Analysis","nav.financeCenter":"Finance Center","nav.paymentApply":"Payment Settlement","nav.expenseMgmt":"Expense Management","nav.profitAnalysis":"Profit Analysis","nav.accountFlow":"Account Flow","nav.reports":"Reports","nav.shipmentReport":"Shipment Reports","nav.customerReport":"Customer Reports","nav.financeReport":"Finance Reports","nav.agingReport":"Aging Reports","nav.profitReport":"Profit Reports","nav.settings":"System Settings","nav.customerData":"Customer Data","nav.channelMgmt":"Channel Management","nav.destinationMgmt":"Destination Management","nav.productMgmt":"Transport Products","nav.airlineMgmt":"Airline Management","nav.deliveryVendorMgmt":"Delivery Vendors","nav.bankSettings":"Bank Account Settings",
+    "btn.exportAll":"Export All Data","btn.clearLocal":"Clear Local Data","btn.importCsv":"Import CSV","btn.exportStatement":"Export Statement","btn.newShipment":"New Shipment","btn.newPayment":"New Payment","btn.saveBooking":"Save Booking","btn.edit":"Edit","btn.delete":"Delete","booking.title":"Booking Management","booking.subtitle":"Manage booking data, space status, estimated receivables/payables and rate entry in one place.","booking.rateEntry":"Rate Entry","booking.kpiToday":"Today Bookings","booking.kpiWeek":"This Week Bookings","booking.kpiPending":"Pending Confirmation","booking.kpiReleased":"Space Released","booking.kpiDeparted":"Departed","booking.kpiProfit":"Estimated Gross Profit","booking.quickForm":"Quick Booking Form","booking.records":"Booking Records","booking.rateTitle":"Rate Management Entry","booking.rateHint":"This Sprint provides the base structure only; a quotation system can be added later.","booking.empty":"No booking records",
+    "field.bookingDate":"Booking Date","field.customer":"Customer","field.airline":"Airline","field.agent":"Booking Agent","field.flightNo":"Flight No.","field.masterNo":"MAWB / B/L No.","field.originAirport":"Origin Airport","field.destinationAirport":"Destination Airport","field.etd":"ETD","field.eta":"ETA","field.ctn":"Pieces","field.weight":"Weight","field.volumeWeight":"Volume Weight","field.receivableEst":"Estimated Receivable","field.payableEst":"Estimated Payable","field.profitEst":"Estimated Profit","field.status":"Status","field.releaseNo":"Release No.","field.sales":"Sales","field.note":"Remark","field.unitPrice":"Unit Price","field.currency":"Currency","field.validUntil":"Valid Until","field.actions":"Actions"
+  }
+};
+function t(key) { return i18n[currentLanguage]?.[key] || i18n.zh[key] || key; }
+function bookingStatusLabel(status) {
+  const labels = { en: { "待询价": "Inquiry", "待订舱": "To Book", "已订舱": "Booked", "已放舱": "Released", "已起飞": "Departed", "已到港": "Arrived", "已取消": "Cancelled" } };
+  return labels[currentLanguage]?.[status] || status;
+}
+function applyLanguage() {
+  document.documentElement.lang = currentLanguage === "en" ? "en" : "zh-CN";
+  if (els.languageSelect) els.languageSelect.value = currentLanguage;
+  document.querySelectorAll("[data-i18n]").forEach((node) => { node.textContent = t(node.dataset.i18n); });
+  const activeView = document.querySelector(".view.active")?.id?.replace("View", "") || "dashboard";
+  if (els.viewTitle) {
+    const titleMap = { dashboard: t("nav.dashboard"), aging: t("nav.agingAnalysis"), riskCustomers: t("nav.riskCustomers"), profitRank: t("nav.profitRank"), shipments: t("nav.shipments"), operations: t("nav.transport"), booking: t("nav.booking"), payments: t("nav.paymentApply"), customers: t("nav.customerLedger"), finance: t("nav.expenseMgmt"), accounts: t("nav.accountFlow"), settings: t("nav.settings") };
+    els.viewTitle.textContent = titleMap[activeView] || t("nav.dashboard");
+  }
+}
+
 function exportManifestExcel() {
   const html = manifestReportHtml("excel");
   const blob = new Blob(["\ufeff" + html], { type: "application/vnd.ms-excel;charset=utf-8" });
@@ -1692,40 +1857,38 @@ function exportManifestExcel() {
 function renderBookings() {
   if (!els.bookingRows) return;
   const rows = (state.bookings || []).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const todayText = today();
+  const weekStart = new Date(todayText);
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
   const summary = rows.reduce((acc, booking) => {
-    acc.count += 1;
-    acc.ctn += number(booking.ctn);
-    acc.weight += number(booking.weight);
+    const status = booking.status || "待订舱";
     acc.profit += number(booking.receivable) - number(booking.payable);
+    if (booking.date === todayText) acc.today += 1;
+    if (booking.date && new Date(booking.date) >= weekStart) acc.week += 1;
+    if (["待询价", "待订舱", "已订舱"].includes(status)) acc.pending += 1;
+    if (status === "已放舱") acc.released += 1;
+    if (status === "已起飞") acc.departed += 1;
+    acc.statuses[status] = (acc.statuses[status] || 0) + 1;
     return acc;
-  }, { count: 0, ctn: 0, weight: 0, profit: 0 });
-  if (els.bookingCount) els.bookingCount.textContent = String(summary.count);
-  if (els.bookingCtn) els.bookingCtn.textContent = money(summary.ctn);
-  if (els.bookingWeight) els.bookingWeight.textContent = money(summary.weight);
+  }, { today: 0, week: 0, pending: 0, released: 0, departed: 0, profit: 0, statuses: {} });
+  if (els.bookingTodayCount) els.bookingTodayCount.textContent = String(summary.today);
+  if (els.bookingWeekCount) els.bookingWeekCount.textContent = String(summary.week);
+  if (els.bookingPendingCount) els.bookingPendingCount.textContent = String(summary.pending);
+  if (els.bookingReleasedCount) els.bookingReleasedCount.textContent = String(summary.released);
+  if (els.bookingDepartedCount) els.bookingDepartedCount.textContent = String(summary.departed);
   if (els.bookingProfit) els.bookingProfit.textContent = money(summary.profit);
-  els.bookingRows.innerHTML = rows.length ? rows.map((booking) => `
-    <tr>
-      <td>${escapeHtml(booking.date || "")}</td>
-      <td>${escapeHtml(booking.customer || "")}</td>
-      <td>${escapeHtml(booking.airline || "")}</td>
-      <td>${escapeHtml(booking.agent || "")}</td>
-      <td>${escapeHtml(booking.flightNo || "")}</td>
-      <td>${escapeHtml(booking.masterNo || "")}</td>
-      <td>${escapeHtml(booking.originAirport || "")}</td>
-      <td>${escapeHtml(booking.destinationAirport || "")}</td>
-      <td>${escapeHtml(booking.etd || "")}</td>
-      <td>${escapeHtml(booking.eta || "")}</td>
-      <td class="money">${money(booking.ctn)}</td>
-      <td class="money">${money(booking.weight)}</td>
-      <td class="money">${money(booking.volumeWeight)}</td>
-      <td class="money">${money(booking.receivable)}</td>
-      <td class="money">${money(booking.payable)}</td>
-      <td class="money">${money(number(booking.receivable) - number(booking.payable))}</td>
-      <td><span class="status-chip">${escapeHtml(booking.status || "待订舱")}</span></td>
-      <td>${escapeHtml(booking.note || "")}</td>
-      <td><div class="row-actions small-actions"><button type="button" data-edit-booking="${booking.id}">改</button><button type="button" class="danger-action" data-delete-booking="${booking.id}">删</button></div></td>
-    </tr>
-  `).join("") : `<tr><td colspan="19" class="empty">暂无订舱记录</td></tr>`;
+  if (els.bookingStatusBoard) els.bookingStatusBoard.innerHTML = BOOKING_STATUS_FLOW.map((status) => `<article><span>${escapeHtml(bookingStatusLabel(status))}</span><strong>${summary.statuses[status] || 0}</strong></article>`).join("");
+  if (els.bookingTableHead) {
+    const heads = ["field.bookingDate","field.customer","field.status","field.releaseNo","field.airline","field.flightNo","field.masterNo","field.originAirport","field.destinationAirport","field.etd","field.eta","field.ctn","field.weight","field.volumeWeight","field.profitEst","field.sales","field.note","field.actions"];
+    els.bookingTableHead.innerHTML = heads.map((key) => `<th>${t(key)}</th>`).join("");
+  }
+  els.bookingRows.innerHTML = rows.length ? rows.map((booking) => {
+    const currentIndex = BOOKING_STATUS_FLOW.indexOf(booking.status || "待订舱");
+    const nextStatus = currentIndex >= 0 && currentIndex < BOOKING_STATUS_FLOW.length - 2 ? BOOKING_STATUS_FLOW[currentIndex + 1] : "";
+    return `<tr>
+      <td>${escapeHtml(booking.date || "")}</td><td>${escapeHtml(booking.customer || "")}</td><td><span class="status-chip">${escapeHtml(bookingStatusLabel(booking.status || "待订舱"))}</span></td><td>${escapeHtml(booking.releaseNo || "")}</td><td>${escapeHtml(booking.airline || "")}</td><td>${escapeHtml(booking.flightNo || "")}</td><td>${escapeHtml(booking.masterNo || "")}</td><td>${escapeHtml(booking.originAirport || "")}</td><td>${escapeHtml(booking.destinationAirport || "")}</td><td>${escapeHtml(booking.etd || "")}</td><td>${escapeHtml(booking.eta || "")}</td><td class="money">${money(booking.ctn)}</td><td class="money">${money(booking.weight)}</td><td class="money">${money(booking.volumeWeight)}</td><td class="money">${money(number(booking.receivable) - number(booking.payable))}</td><td>${escapeHtml(booking.sales || "")}</td><td>${escapeHtml(booking.note || "")}</td><td><div class="row-actions booking-actions"><button type="button" data-edit-booking="${booking.id}">${t("btn.edit")}</button>${nextStatus ? `<button type="button" data-advance-booking="${booking.id}">${escapeHtml(bookingStatusLabel(nextStatus))}</button>` : ""}<button type="button" class="danger-action" data-delete-booking="${booking.id}">${t("btn.delete")}</button></div></td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="18" class="empty">${t("booking.empty")}</td></tr>`;
 }
 
 function saveBooking(event) {
@@ -1750,6 +1913,8 @@ function saveBooking(event) {
     receivable: number(data.receivable),
     payable: number(data.payable),
     status: data.status || "待订舱",
+    releaseNo: data.releaseNo || "",
+    sales: data.sales || "",
     note: data.note || "",
   };
   const index = (state.bookings || []).findIndex((item) => item.id === record.id);
@@ -1896,8 +2061,8 @@ function renderAgingAnalysis() {
 
 function renderRiskCustomers() {
   if (!els.riskSummaryCards && !els.riskCustomerRows) return;
-  const rows = customerPerformanceSummary().filter((row) => row.open > 0.009);
-  const groups = ["高风险", "需跟进", "低风险"].map((level) => {
+  const rows = customerPerformanceSummary().filter((row) => row.open > 0.009 || !["正常"].includes(enhancedRiskLevel(row)));
+  const groups = ["黑名单", "高风险", "关注", "正常"].map((level) => {
     const items = rows.filter((row) => enhancedRiskLevel(row) === level);
     return { level, count: items.length, amount: items.reduce((sum, row) => sum + row.open, 0) };
   });
@@ -1912,7 +2077,7 @@ function renderRiskCustomers() {
   }
   if (els.riskCustomerRows) {
     const sorted = rows.sort((a, b) => {
-      const weight = { 高风险: 3, 需跟进: 2, 低风险: 1, 正常: 0 };
+      const weight = { 黑名单: 4, 高风险: 3, 关注: 2, 正常: 1 };
       return (weight[enhancedRiskLevel(b)] || 0) - (weight[enhancedRiskLevel(a)] || 0) || b.open - a.open;
     });
     els.riskCustomerRows.innerHTML = sorted.length ? sorted.map((row) => {
@@ -1920,7 +2085,7 @@ function renderRiskCustomers() {
       return `
       <tr>
         <td><button class="link-cell" type="button" data-preview-customer="${escapeHtml(row.customer)}" data-jump="customers">${escapeHtml(row.customer)}</button></td>
-        <td><span class="status ${level === "高风险" ? "open" : level === "需跟进" ? "balance" : "paid"}">${escapeHtml(level)}</span></td>
+        <td><span class="status ${level === "黑名单" || level === "高风险" ? "open" : level === "关注" ? "balance" : "paid"}">${escapeHtml(level)}</span></td>
         <td class="money">${money(row.open)}</td>
         <td>${row.maxAgeDays}天</td>
         <td>${percent(row.collectionRate)}</td>
@@ -1936,12 +2101,12 @@ function renderProfitRank() {
   if (!els.customerProfitRank && !els.shipmentProfitRank) return;
   if (els.customerProfitRank) {
     const rows = customerProfitRanking();
-    els.customerProfitRank.innerHTML = rows.length ? rows.map((row, index) => renderRankItem(index, row.customer, money(row.profit), `收入 ${money(row.receivable)} · 未收 ${money(row.open)} · ${percent(row.collectionRate)}`))
+    els.customerProfitRank.innerHTML = rows.length ? rows.map((row, index) => renderRankItem(index, row.customer, money(row.collectibleProfit), `原毛利 ${money(row.profit)} · 核销调整 ${money(row.writeOffAdjustment)} · 未收 ${money(row.open)}`))
       .join("") : `<div class="empty">暂无客户利润数据</div>`;
   }
   if (els.shipmentProfitRank) {
     const rows = shipmentProfitRanking();
-    els.shipmentProfitRank.innerHTML = rows.length ? rows.map((row, index) => renderRankItem(index, row.waybill || row.masterNo || "未填单号", money(row.profit), `${row.customer || "-"} · 应收 ${money(row.shouldReceive)} · 成本 ${money(row.cost)}`, row.profit < 0))
+    els.shipmentProfitRank.innerHTML = rows.length ? rows.map((row, index) => renderRankItem(index, row.waybill || row.masterNo || "未填单号", money(row.collectibleProfit), `${row.customer || "-"} · 原毛利 ${money(row.profit)} · 核销调整 ${money(row.writeOffAdjustment)}`, row.collectibleProfit < 0))
       .join("") : `<div class="empty">暂无业务利润数据</div>`;
   }
 }
@@ -1960,7 +2125,7 @@ function renderCustomerUpgradeCards() {
   if (!els.customerUpgradeCards) return;
   const rows = customerPerformanceSummary();
   const totalOpen = rows.reduce((sum, row) => sum + row.open, 0);
-  const highRisk = rows.filter((row) => enhancedRiskLevel(row) === "高风险").length;
+  const highRisk = rows.filter((row) => ["黑名单", "高风险"].includes(enhancedRiskLevel(row))).length;
   const overdueAmount = rows.reduce((sum, row) => sum + row.overdueAmount, 0);
   const avgCollection = rows.length ? rows.reduce((sum, row) => sum + row.collectionRate, 0) / rows.length : 0;
   els.customerUpgradeCards.innerHTML = `
@@ -1985,23 +2150,23 @@ function renderCustomers() {
 }
 
 function renderCustomerSummaryRows(rows, emptyText, completed = false) {
-  const performanceMap = new Map(customerPerformanceSummary().map((row) => [row.customer, row]));
   return rows.length ? rows.map((c) => {
-    const perf = performanceMap.get(c.customer) || c;
+    const perf = enrichCustomerCredit(c);
     const risk = enhancedRiskLevel(perf);
+    const riskClass = risk === "黑名单" || risk === "高风险" ? "open" : risk === "关注" ? "balance" : "paid";
     return `
     <tr>
-      <td><button class="link-cell" type="button" data-preview-customer="${escapeHtml(c.customer)}">${escapeHtml(c.customer)}</button></td>
-      <td>${c.count}</td>
-      <td class="money">${money(c.receivable)}</td>
-      <td>${escapeHtml((c.currencies || ["RMB"]).join(" / "))}</td>
-      <td class="money">${money(c.paid)}</td>
+      <td><button class="link-cell" type="button" data-preview-customer="${escapeHtml(c.customer)}">${escapeHtml(perf.customerName || c.customer)}</button></td>
+      <td>${escapeHtml(perf.customerGrade || "B")}</td>
+      <td class="money">${money(perf.creditLimit)}</td>
       <td class="money">${money(c.open)}</td>
-      <td><span class="status ${completed ? "paid" : risk === "高风险" ? "open" : risk === "需跟进" ? "balance" : "paid"}">${completed ? "完成结算" : escapeHtml(risk)}</span></td>
-      <td>${perf.maxAgeDays || 0}天</td>
+      <td class="money ${perf.availableCredit < 0 ? "danger-text" : ""}">${perf.creditLimit ? money(perf.availableCredit) : "未设额度"}</td>
+      <td>${perf.maxAgeDays || 0}天 / ${perf.creditDays || 0}天</td>
       <td>${percent(perf.collectionRate || 0)}</td>
-      <td class="money">${money(perf.profit || 0)}</td>
-      <td>${escapeHtml(c.lastDate)}</td>
+      <td><span class="status ${completed ? "paid" : riskClass}">${completed ? "完成结算" : escapeHtml(risk)}</span></td>
+      <td>${perf.holdShipment ? "是" : "否"}</td>
+      <td class="money">${money(c.writeOffAdjustment || 0)}</td>
+      <td class="money">${money(perf.collectibleProfit || 0)}</td>
     </tr>`;
   }).join("") : `<tr><td colspan="11" class="empty">${escapeHtml(emptyText)}</td></tr>`;
 }
@@ -2044,12 +2209,13 @@ function renderCustomerDetail() {
   const totals = rows.reduce((acc, row) => {
     acc.receivable += row.shouldReceive;
     acc.paid += row.paid;
+    acc.writeOffAdjustment += row.writeOffAdjustment;
     acc.open += row.open;
     return acc;
-  }, { receivable: 0, paid: 0, open: 0 });
+  }, { receivable: 0, paid: 0, writeOffAdjustment: 0, open: 0 });
   panel.hidden = false;
   document.querySelector("#customerDetailTitle").textContent = `${selectedCustomerDetail} 账单明细预览`;
-  document.querySelector("#customerDetailSummary").textContent = `票数 ${rows.length} ｜ 总应收 ${money(totals.receivable)} ｜ 已核销 ${money(totals.paid)} ｜ 未收 ${money(totals.open)}`;
+  document.querySelector("#customerDetailSummary").textContent = `票数 ${rows.length} ｜ 总应收 ${money(totals.receivable)} ｜ 真实回款 ${money(totals.paid)} ｜ 核销调整 ${money(totals.writeOffAdjustment)} ｜ 未收 ${money(totals.open)}`;
   els.customerDetailRows.innerHTML = rows.length ? rows.map((row) => `
     <tr>
       <td>${escapeHtml(row.date)}</td>
@@ -2063,10 +2229,11 @@ function renderCustomerDetail() {
       <td class="money">${money(row.unitPrice)}</td>
       <td class="money">${money(row.shouldReceive)}</td>
       <td class="money">${money(row.paid)}</td>
+      <td class="money">${money(row.writeOffAdjustment)}</td>
       <td class="money">${money(row.open)}</td>
       <td><span class="status ${paymentStatusClass(row.status)}">${escapeHtml(row.status)}</span></td>
     </tr>
-  `).join("") : `<tr><td colspan="13" class="empty">暂无该客户单位明细</td></tr>`;
+  `).join("") : `<tr><td colspan="14" class="empty">暂无该客户单位明细</td></tr>`;
 }
 
 function renderCustomerSearchSuggestions() {
@@ -2102,6 +2269,7 @@ function renderFinance() {
   document.querySelector("#financeRevenue").textContent = money(summary.revenue);
   document.querySelector("#financeBizCost").textContent = money(summary.bizCost);
   document.querySelector("#financeGrossProfit").textContent = money(summary.grossProfit);
+  if (els.financeOffset) els.financeOffset.textContent = money(summary.writeOffAdjustment);
   document.querySelector("#financeExpense").textContent = money(summary.expense);
   document.querySelector("#financeNetProfit").textContent = money(summary.netProfit);
 
@@ -2123,6 +2291,18 @@ function renderFinance() {
       </td>
     </tr>
   `).join("") : `<tr><td colspan="9" class="empty">暂无费用登记</td></tr>`;
+
+  const offsets = writeOffAdjustmentSummary();
+  if (els.offsetBars) {
+    const maxOffset = Math.max(1, ...offsets.map((item) => item.amount));
+    els.offsetBars.innerHTML = offsets.length ? offsets.map((item) => `
+      <div class="bar-row">
+        <strong>${escapeHtml(item.category)}</strong>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.max(4, item.amount / maxOffset * 100)}%"></div></div>
+        <span class="money">${money(item.amount)}</span>
+      </div>
+    `).join("") : `<div class="empty">暂无核销调整</div>`;
+  }
 
   const categories = expenseSummary();
   const maxAmount = Math.max(1, ...categories.map((item) => item.amount));
@@ -2470,28 +2650,32 @@ function rejectAccountRequest(requestId) {
 }
 
 function renderProfiles() {
-  els.profileRows.innerHTML = state.profiles.length ? state.profiles.map((p) => `
+  els.profileRows.innerHTML = state.profiles.length ? state.profiles.map((raw) => {
+    const p = normalizeProfileRecord(raw);
+    return `
     <tr>
-      <td>${escapeHtml(p.mark)}</td>
-      <td>${escapeHtml(p.shipper || p.receiver)}</td>
-      <td>${escapeHtml(p.receiver)}</td>
-      <td>${escapeHtml(p.receiverPhone || p.shipperPhone)}</td>
-      <td>${escapeHtml(p.address)}</td>
+      <td>${escapeHtml(p.customerName)}</td>
+      <td>${escapeHtml(p.shortName)}</td>
+      <td>${escapeHtml(p.contact)}</td>
+      <td>${escapeHtml(p.phone)}</td>
+      <td>${escapeHtml(p.customerGrade)} / ${money(p.creditLimit)}</td>
+      <td>${p.creditDays}天 / ${escapeHtml(p.manualRiskLevel)}</td>
+      <td>${p.holdShipment ? "是" : "否"}</td>
       <td>
         <div class="row-actions">
           <button title="编辑" data-edit-customer="${p.id}">改</button>
           <button title="删除" data-delete-customer="${p.id}">删</button>
         </div>
       </td>
-    </tr>
-  `).join("") : `<tr><td colspan="6" class="empty">暂无客户单位资料</td></tr>`;
+    </tr>`;
+  }).join("") : `<tr><td colspan="8" class="empty">暂无客户单位资料</td></tr>`;
 }
 
 function findProfileForShipment(shipment) {
   const lowerCustomer = String(shipment.customer || "").toLowerCase();
   const lowerMark = String(shipment.mark || "").toLowerCase();
   return state.profiles.find((p) => {
-    return [p.mark, p.receiver, p.shipper].some((value) => {
+    return [p.customerName, p.shortName, p.mark, p.receiver, p.shipper].some((value) => {
       const lower = String(value || "").toLowerCase();
       return lower && (lower === lowerCustomer || lower === lowerMark);
     });
@@ -2502,7 +2686,7 @@ function findProfileByCustomer(customer) {
   const target = normalizeText(customer);
   if (!target) return null;
   return state.profiles.find((profile) => {
-    return [profile.receiver, profile.shipper, profile.mark].some((value) => normalizeText(value) === target);
+    return [profile.customerName, profile.shortName, profile.receiver, profile.shipper, profile.mark].some((value) => normalizeText(value) === target);
   }) || null;
 }
 
@@ -2515,13 +2699,27 @@ function rememberCustomerContact(shipment) {
   if (profile) {
     if (address) profile.address = address;
     if (receiverPhone) profile.receiverPhone = receiverPhone;
+    if (!profile.customerName) profile.customerName = customer;
+    if (!profile.contact) profile.contact = customer;
     if (!profile.shipper) profile.shipper = customer;
     if (!profile.receiver) profile.receiver = customer;
     if (!profile.mark && shipment.mark) profile.mark = shipment.mark;
+    if (!profile.shortName) profile.shortName = profile.mark || customer;
     return;
   }
   state.profiles.push({
     id: id("c"),
+    customerName: customer,
+    shortName: shipment.mark || customer,
+    contact: customer,
+    phone: receiverPhone,
+    email: "",
+    countryRegion: "",
+    customerGrade: "B",
+    creditLimit: 0,
+    creditDays: 30,
+    manualRiskLevel: "正常",
+    holdShipment: false,
     mark: shipment.mark || "",
     shipper: customer,
     shipperPhone: "",
@@ -2932,19 +3130,18 @@ function addOption(key, value) {
 
 function switchView(view) {
   const titleMap = {
-    dashboard: "运营总览",
-    shipments: "运单中心",
-    operations: "操作中心",
-    booking: "订舱中心",
-    payments: "财务核销",
-    customers: "应收帐款",
-    finance: "费用报表",
-    accounts: "账户流水",
-    settings: "基础资料",
+    dashboard: t("nav.dashboard"), aging: t("nav.agingAnalysis"), riskCustomers: t("nav.riskCustomers"), profitRank: t("nav.profitRank"),
+    shipments: t("nav.shipments"), operations: t("nav.transport"), booking: t("nav.booking"), payments: t("nav.paymentApply"), customers: t("nav.customerLedger"), finance: t("nav.expenseMgmt"), accounts: t("nav.accountFlow"), settings: t("nav.settings"),
   };
   els.navItems.forEach((btn) => btn.classList.toggle("active", btn.dataset.view === view));
+  document.querySelectorAll(".nav-sub button").forEach((btn) => btn.classList.toggle("active", btn.dataset.jump === view));
+  document.querySelectorAll(".nav-group").forEach((group) => {
+    const ownsView = [...group.querySelectorAll("[data-view], [data-jump]")].some((item) => item.dataset.view === view || item.dataset.jump === view);
+    group.classList.toggle("current", ownsView);
+    if (ownsView) group.classList.add("expanded");
+  });
   els.views.forEach((section) => section.classList.toggle("active", section.id === `${view}View`));
-  els.viewTitle.textContent = titleMap[view] || "运营总览";
+  els.viewTitle.textContent = titleMap[view] || t("nav.dashboard");
 }
 
 function formToObject(form) {
@@ -2976,6 +3173,7 @@ function openShipment(data = null) {
   if (!hasCargoMeasurementRows(cargoRows)) syncCargoSummaryFromMainFields(els.shipmentForm);
   autoFillChargeWeight(els.shipmentForm);
   updateShipmentCostSummary();
+  updateCustomerCreditRiskPrompt(els.shipmentForm);
   const detailTrackBtn = document.querySelector("#shipmentDetailTrackBtn");
   const detailPodBtn = document.querySelector("#shipmentDetailPodBtn");
   [detailTrackBtn, detailPodBtn].forEach((btn) => {
@@ -3290,13 +3488,27 @@ function clearCustomerLinkedFields(form) {
   ensureDefaultUnitPriceCurrency(form);
 }
 
+function updateCustomerCreditRiskPrompt(form) {
+  const box = form?.querySelector?.("[data-credit-risk-alert]");
+  if (!box || !form.customer) return;
+  const customer = String(form.customer.value || "").trim();
+  if (!customer) { box.hidden = true; box.textContent = ""; return; }
+  const assessment = customerCreditAssessment(customer);
+  if (!assessment.risky) { box.hidden = true; box.textContent = ""; return; }
+  box.hidden = false;
+  const reasonText = assessment.reasons.length ? `（${assessment.reasons.join("、")}）` : "";
+  box.textContent = `该客户存在信用风险${reasonText}，请老板确认后继续放货。`;
+}
+
 function handleCustomerUnitChange(form) {
   if (!form.customer) return;
   if (!String(form.customer.value || "").trim()) {
     clearCustomerLinkedFields(form);
+    updateCustomerCreditRiskPrompt(form);
     return;
   }
   if (!applyHabitualOptions(form, true)) clearCustomerLinkedFields(form);
+  updateCustomerCreditRiskPrompt(form);
 }
 
 function cleanWaybillPrefix(value) {
@@ -3663,7 +3875,8 @@ function calculateVolumeFromCarton(form, options = {}) {
 }
 
 function openCustomer(data = null) {
-  fillForm(els.customerForm, data || {});
+  fillForm(els.customerForm, normalizeProfileRecord(data || {}));
+  if (els.customerForm.holdShipment) els.customerForm.holdShipment.checked = Boolean(data?.holdShipment);
   els.customerDialog.showModal();
 }
 
@@ -4505,6 +4718,19 @@ function saveShipment(event) {
     costInsurance: number(data.costInsurance),
     costOther: number(data.costOther),
     costNote: data.costNote || "",
+    offsetTail: number(data.offsetTail),
+    offsetTailCurrency: data.offsetTailCurrency || "RMB",
+    offsetExchange: number(data.offsetExchange),
+    offsetExchangeCurrency: data.offsetExchangeCurrency || "RMB",
+    offsetDiscount: number(data.offsetDiscount),
+    offsetDiscountCurrency: data.offsetDiscountCurrency || "RMB",
+    offsetBadDebt: number(data.offsetBadDebt),
+    offsetBadDebtCurrency: data.offsetBadDebtCurrency || "RMB",
+    offsetCompensation: number(data.offsetCompensation),
+    offsetCompensationCurrency: data.offsetCompensationCurrency || "RMB",
+    offsetOther: number(data.offsetOther),
+    offsetOtherCurrency: data.offsetOtherCurrency || "RMB",
+    offsetNote: data.offsetNote || "",
     statusHistory: Array.isArray(existingShipment?.statusHistory) ? existingShipment.statusHistory : [],
     podRecords: Array.isArray(existingShipment?.podRecords) ? existingShipment.podRecords : [],
   };
@@ -4582,6 +4808,7 @@ function saveQuickShipment(event) {
     costInsurance: 0,
     costOther: 0,
     costNote: "",
+    offsetTail: 0, offsetTailCurrency: "RMB", offsetExchange: 0, offsetExchangeCurrency: "RMB", offsetDiscount: 0, offsetDiscountCurrency: "RMB", offsetBadDebt: 0, offsetBadDebtCurrency: "RMB", offsetCompensation: 0, offsetCompensationCurrency: "RMB", offsetOther: 0, offsetOtherCurrency: "RMB", offsetNote: "",
     terms: data.terms || "到付票结DDP",
     shipmentStatus: data.shipmentStatus || "新货入仓",
     customsStatus: data.customsStatus || "未开始",
@@ -4681,7 +4908,7 @@ function saveQuickPayment(event) {
 
 function saveCustomer(event) {
   event.preventDefault();
-  const record = formToObject(els.customerForm);
+  const record = normalizeProfileRecord(formToObject(els.customerForm));
   if (record.id) {
     state.profiles = state.profiles.map((p) => p.id === record.id ? record : p);
   } else {
@@ -5310,6 +5537,18 @@ function exportExpenses() {
 
 function financeReportHtml(mode = "print") {
   const summary = financeSummary();
+  const offsets = writeOffAdjustmentSummary();
+  if (els.offsetBars) {
+    const maxOffset = Math.max(1, ...offsets.map((item) => item.amount));
+    els.offsetBars.innerHTML = offsets.length ? offsets.map((item) => `
+      <div class="bar-row">
+        <strong>${escapeHtml(item.category)}</strong>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.max(4, item.amount / maxOffset * 100)}%"></div></div>
+        <span class="money">${money(item.amount)}</span>
+      </div>
+    `).join("") : `<div class="empty">暂无核销调整</div>`;
+  }
+
   const categories = expenseSummary();
   const logo = mode === "print" ? (window.COMPANY_LOGO_DATA_URL || "") : "";
   const categoryRows = categories.map((item) => `
@@ -5585,8 +5824,18 @@ function bindEvents() {
     const side = event.target?.dataset?.operationSelectAll;
     if (side) setOperationSelectAll(side, event.target.checked);
   });
-  els.navItems.forEach((btn) => btn.addEventListener("click", () => switchView(btn.dataset.view)));
-  document.querySelectorAll("[data-jump]").forEach((btn) => btn.addEventListener("click", () => switchView(btn.dataset.jump)));
+  els.navItems.forEach((btn) => btn.addEventListener("click", () => {
+    const group = btn.closest(".nav-group");
+    const wasExpanded = group?.classList.contains("expanded");
+    switchView(btn.dataset.view);
+    if (group && wasExpanded && group.classList.contains("current")) group.classList.remove("expanded");
+  }));
+  document.querySelectorAll("[data-jump]").forEach((btn) => btn.addEventListener("click", () => {
+    const jumpTarget = btn.dataset.jump;
+    const section = document.getElementById(jumpTarget);
+    if (section && !section.classList.contains("view")) section.scrollIntoView({ behavior: "smooth", block: "start" });
+    else switchView(jumpTarget);
+  }));
   document.querySelector("#quickShipmentBtn").addEventListener("click", () => openShipment());
   document.querySelector("#quickPaymentBtn").addEventListener("click", () => openPayment());
   document.querySelector("#statementBtn").addEventListener("click", openStatementDialog);
@@ -5625,6 +5874,9 @@ function bindEvents() {
   els.quickShipmentForm.addEventListener("submit", saveQuickShipment);
   els.quickPaymentForm.addEventListener("submit", saveQuickPayment);
   els.bookingForm?.addEventListener("submit", saveBooking);
+  els.languageSelect?.addEventListener("change", (event) => { currentLanguage = event.target.value; localStorage.setItem(LANGUAGE_STORAGE_KEY, currentLanguage); applyLanguage(); render(); });
+  if (els.bookingForm?.status) els.bookingForm.status.innerHTML = BOOKING_STATUS_FLOW.map((status) => `<option>${status}</option>`).join("");
+  [els.bookingForm?.receivable, els.bookingForm?.payable].forEach((input) => input?.addEventListener("input", () => { if (els.bookingForm.profitPreview) els.bookingForm.profitPreview.value = (number(els.bookingForm.receivable.value) - number(els.bookingForm.payable.value)).toFixed(2); }));
   els.paymentForm.currency.addEventListener("change", () => syncPaymentRate(els.paymentForm));
   els.quickPaymentForm.currency.addEventListener("change", () => syncPaymentRate(els.quickPaymentForm));
   [els.paymentForm, els.quickPaymentForm].forEach((form) => {
@@ -5726,7 +5978,7 @@ function bindEvents() {
       });
     });
   });
-  const costSummaryFields = ["chargeWeight", "aedRate", "usdRate", ...MONEY_KEYS, ...MONEY_KEYS.map((key) => `${key}Currency`)];
+  const costSummaryFields = ["chargeWeight", "aedRate", "usdRate", ...MONEY_KEYS, ...MONEY_KEYS.map((key) => `${key}Currency`), ...WRITE_OFF_ADJUSTMENT_TYPES.map((item) => item.key), ...WRITE_OFF_ADJUSTMENT_TYPES.map((item) => `${item.key}Currency`)];
   els.shipmentForm.querySelectorAll(costSummaryFields.map((name) => `[name="${name}"]`).join(", ")).forEach((input) => {
     ["input", "change", "blur", "keyup"].forEach((eventName) => {
       input.addEventListener(eventName, updateShipmentCostSummary);
@@ -5843,6 +6095,7 @@ function bindEvents() {
     const rejectAccountId = target.dataset.rejectAccount;
     const editBookingId = target.dataset.editBooking;
     const deleteBookingId = target.dataset.deleteBooking;
+    const advanceBookingId = target.dataset.advanceBooking;
     if (podViewId) {
       event.preventDefault();
       event.stopPropagation();
@@ -5861,6 +6114,12 @@ function bindEvents() {
     }
     if (openOperationSide) {
       document.querySelector(`#${openOperationSide}OperationDialog`)?.showModal();
+      return;
+    }
+    if (advanceBookingId) {
+      const booking = (state.bookings || []).find((item) => item.id === advanceBookingId);
+      const currentIndex = BOOKING_STATUS_FLOW.indexOf(booking?.status || "待订舱");
+      if (booking && currentIndex >= 0 && currentIndex < BOOKING_STATUS_FLOW.length - 2) { booking.status = BOOKING_STATUS_FLOW[currentIndex + 1]; saveState(); render(); }
       return;
     }
     if (editBookingId) {
@@ -5932,4 +6191,6 @@ function splitOptions(value) {
 }
 
 bindEvents();
+applyLanguage();
+switchView("dashboard");
 render();
