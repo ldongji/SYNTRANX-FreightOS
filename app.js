@@ -277,6 +277,8 @@ const els = {
   customerProfitRank: document.querySelector("#customerProfitRank"),
   shipmentProfitRank: document.querySelector("#shipmentProfitRank"),
   customerUpgradeCards: document.querySelector("#customerUpgradeCards"),
+  creditRows: document.querySelector("#creditRows"),
+  offsetBars: document.querySelector("#offsetBars"),
   expenseBars: document.querySelector("#expenseBars"),
   opsStages: document.querySelector("#opsStages"),
   shipmentDialog: document.querySelector("#shipmentDialog"),
@@ -935,6 +937,14 @@ function customerSummary() {
   return [...map.values()].sort((a, b) => b.open - a.open);
 }
 
+function offsetAdjustmentRows() {
+  return state.payments.filter((payment) => ["未收对冲", "坏账核销", "退款/冲销"].includes(payment.method) || ["QT业务往来冲账", "QT坏账核销"].includes(normalizeAccountName(payment.receiveAccount)));
+}
+
+function offsetAdjustmentAmount() {
+  return offsetAdjustmentRows().reduce((sum, payment) => sum + paymentRmb(payment), 0);
+}
+
 function financeSummary() {
   const biz = state.shipments.reduce((acc, shipment) => {
     const st = settlement(shipment);
@@ -944,7 +954,8 @@ function financeSummary() {
     return acc;
   }, { revenue: 0, bizCost: 0, grossProfit: 0 });
   const expense = reportExpenseRows().reduce((sum, item) => sum + expenseRmb(item), 0);
-  return { ...biz, expense, netProfit: biz.grossProfit - expense };
+  const offset = offsetAdjustmentAmount();
+  return { ...biz, offset, expense, netProfit: biz.grossProfit - expense - offset };
 }
 
 function expenseSummary() {
@@ -1047,10 +1058,23 @@ function enhancedRiskLevel(customer) {
   return "低风险";
 }
 
+function creditPolicyForCustomer(customer) {
+  const baseLimit = 30000;
+  const profitBonus = Math.max(0, Math.min(40000, number(customer.profit) * 0.5));
+  const historyBonus = Math.min(30000, number(customer.receivable) * 0.15);
+  const riskPenalty = customer.maxAgeDays > 60 ? 30000 : customer.maxAgeDays > 30 ? 12000 : 0;
+  const creditLimit = Math.max(10000, baseLimit + profitBonus + historyBonus - riskPenalty);
+  const usedRate = creditLimit > 0 ? number(customer.open) / creditLimit : 0;
+  const creditDays = enhancedRiskLevel(customer) === "高风险" ? 7 : enhancedRiskLevel(customer) === "需跟进" ? 15 : 30;
+  const overdueDays = Math.max(0, number(customer.maxAgeDays) - creditDays);
+  return { creditLimit, usedRate, creditDays, overdueDays };
+}
+
 function riskSuggestion(customer) {
   const level = enhancedRiskLevel(customer);
-  if (level === "高风险") return "暂停放货/老板确认授信";
-  if (level === "需跟进") return "48小时内催收并复核账单";
+  const policy = creditPolicyForCustomer(customer);
+  if (level === "高风险" || policy.usedRate >= 1) return "暂停放货/老板确认授信";
+  if (level === "需跟进" || policy.overdueDays > 0) return "48小时内催收并复核账单";
   if (customer.open > 0) return "正常提醒回款";
   return "保持合作";
 }
@@ -1692,12 +1716,12 @@ function exportManifestPdf() {
 
 const i18n = {
   zh: {
-    "nav.dashboard":"老板驾驶舱","nav.overview":"经营总览","nav.aging":"账龄结构","nav.riskCustomers":"风险客户","nav.profitRank":"利润排行","nav.opsAlerts":"运营预警","nav.business":"业务管理","nav.shipments":"运单管理","nav.booking":"订舱管理","nav.customerBills":"客户账单","nav.transport":"运输操作","nav.inbound":"入仓","nav.outbound":"出仓","nav.customs":"清关","nav.delivery":"派送","nav.pod":"签收","nav.exceptions":"异常件","nav.customerMgmt":"客户管理","nav.customerProfiles":"客户档案","nav.customerLedger":"客户总账","nav.receivables":"应收账款","nav.agingAnalysis":"账龄分析","nav.financeCenter":"财务中心","nav.paymentApply":"回款核销","nav.expenseMgmt":"费用管理","nav.profitAnalysis":"利润分析","nav.accountFlow":"账户流水","nav.reports":"报表中心","nav.shipmentReport":"运单报表","nav.customerReport":"客户报表","nav.financeReport":"财务报表","nav.agingReport":"账龄报表","nav.profitReport":"利润报表","nav.settings":"系统设置","nav.customerData":"客户资料","nav.channelMgmt":"渠道管理","nav.destinationMgmt":"目的地管理","nav.productMgmt":"运输产品管理","nav.airlineMgmt":"航空公司管理","nav.deliveryVendorMgmt":"派送商管理","nav.bankSettings":"银行账户设置",
+    "nav.dashboard":"老板驾驶舱","nav.overview":"经营总览","nav.aging":"账龄结构","nav.riskCustomers":"风险客户","nav.profitRank":"利润排行","nav.opsAlerts":"运营预警","nav.business":"业务管理","nav.shipments":"运单管理","nav.booking":"订舱管理","nav.customerBills":"客户账单","nav.transport":"运输操作","nav.inbound":"入仓","nav.outbound":"出仓","nav.customs":"清关","nav.delivery":"派送","nav.pod":"签收","nav.exceptions":"异常件","nav.customerMgmt":"客户信用管理","nav.customerProfiles":"客户档案","nav.customerLedger":"客户总账","nav.receivables":"应收账款","nav.agingAnalysis":"账龄分析","nav.financeCenter":"财务中心","nav.paymentApply":"回款核销","nav.expenseMgmt":"费用管理","nav.profitAnalysis":"利润分析","nav.accountFlow":"账户流水","nav.reports":"报表中心","nav.shipmentReport":"运单报表","nav.customerReport":"客户报表","nav.financeReport":"财务报表","nav.agingReport":"账龄报表","nav.profitReport":"利润报表","nav.settings":"系统设置","nav.customerData":"客户资料","nav.channelMgmt":"渠道管理","nav.destinationMgmt":"目的地管理","nav.productMgmt":"运输产品管理","nav.airlineMgmt":"航空公司管理","nav.deliveryVendorMgmt":"派送商管理","nav.bankSettings":"银行账户设置",
     "btn.exportAll":"导出全部数据","btn.clearLocal":"清空本机数据","btn.importCsv":"导入登记CSV","btn.exportStatement":"导出账单","btn.newShipment":"新增业务","btn.newPayment":"登记回款","btn.saveBooking":"保存订舱","btn.edit":"改","btn.delete":"删","booking.title":"订舱管理","booking.subtitle":"订舱资料、舱位状态、预估应收应付与运价入口统一管理。","booking.rateEntry":"运价管理入口","booking.kpiToday":"今日订舱票数","booking.kpiWeek":"本周订舱票数","booking.kpiPending":"待确认订舱","booking.kpiReleased":"已放舱","booking.kpiDeparted":"已起飞","booking.kpiProfit":"预计毛利","booking.quickForm":"快速订舱表单","booking.records":"订舱记录表","booking.rateTitle":"运价管理入口","booking.rateHint":"当前 Sprint 仅提供基础结构，后续可扩展为报价系统。","booking.empty":"暂无订舱记录",
     "field.bookingDate":"订舱日期","field.customer":"客户单位","field.airline":"航空公司","field.agent":"订舱代理","field.flightNo":"航班号","field.masterNo":"主单号/提单号","field.originAirport":"起飞机场","field.destinationAirport":"目的机场","field.etd":"预计起飞","field.eta":"预计到达","field.ctn":"件数","field.weight":"重量","field.volumeWeight":"体积重","field.receivableEst":"应收预估","field.payableEst":"应付预估","field.profitEst":"毛利预估","field.status":"状态","field.releaseNo":"放舱号","field.sales":"业务员","field.note":"备注","field.unitPrice":"单价","field.currency":"币种","field.validUntil":"有效期","field.actions":"操作"
   },
   en: {
-    "nav.dashboard":"Executive Dashboard","nav.overview":"Overview","nav.aging":"Aging Structure","nav.riskCustomers":"Risk Customers","nav.profitRank":"Profit Ranking","nav.opsAlerts":"Ops Alerts","nav.business":"Business Management","nav.shipments":"Shipment Management","nav.booking":"Booking Management","nav.customerBills":"Customer Bills","nav.transport":"Transport Operations","nav.inbound":"Inbound","nav.outbound":"Outbound","nav.customs":"Customs","nav.delivery":"Delivery","nav.pod":"POD","nav.exceptions":"Exceptions","nav.customerMgmt":"Customer Management","nav.customerProfiles":"Customer Profiles","nav.customerLedger":"Customer Ledger","nav.receivables":"Receivables","nav.agingAnalysis":"Aging Analysis","nav.financeCenter":"Finance Center","nav.paymentApply":"Payment Settlement","nav.expenseMgmt":"Expense Management","nav.profitAnalysis":"Profit Analysis","nav.accountFlow":"Account Flow","nav.reports":"Reports","nav.shipmentReport":"Shipment Reports","nav.customerReport":"Customer Reports","nav.financeReport":"Finance Reports","nav.agingReport":"Aging Reports","nav.profitReport":"Profit Reports","nav.settings":"System Settings","nav.customerData":"Customer Data","nav.channelMgmt":"Channel Management","nav.destinationMgmt":"Destination Management","nav.productMgmt":"Transport Products","nav.airlineMgmt":"Airline Management","nav.deliveryVendorMgmt":"Delivery Vendors","nav.bankSettings":"Bank Account Settings",
+    "nav.dashboard":"Executive Dashboard","nav.overview":"Overview","nav.aging":"Aging Structure","nav.riskCustomers":"Risk Customers","nav.profitRank":"Profit Ranking","nav.opsAlerts":"Ops Alerts","nav.business":"Business Management","nav.shipments":"Shipment Management","nav.booking":"Booking Management","nav.customerBills":"Customer Bills","nav.transport":"Transport Operations","nav.inbound":"Inbound","nav.outbound":"Outbound","nav.customs":"Customs","nav.delivery":"Delivery","nav.pod":"POD","nav.exceptions":"Exceptions","nav.customerMgmt":"Customer Credit","nav.customerProfiles":"Customer Profiles","nav.customerLedger":"Customer Ledger","nav.receivables":"Receivables","nav.agingAnalysis":"Aging Analysis","nav.financeCenter":"Finance Center","nav.paymentApply":"Payment Settlement","nav.expenseMgmt":"Expense Management","nav.profitAnalysis":"Profit Analysis","nav.accountFlow":"Account Flow","nav.reports":"Reports","nav.shipmentReport":"Shipment Reports","nav.customerReport":"Customer Reports","nav.financeReport":"Finance Reports","nav.agingReport":"Aging Reports","nav.profitReport":"Profit Reports","nav.settings":"System Settings","nav.customerData":"Customer Data","nav.channelMgmt":"Channel Management","nav.destinationMgmt":"Destination Management","nav.productMgmt":"Transport Products","nav.airlineMgmt":"Airline Management","nav.deliveryVendorMgmt":"Delivery Vendors","nav.bankSettings":"Bank Account Settings",
     "btn.exportAll":"Export All Data","btn.clearLocal":"Clear Local Data","btn.importCsv":"Import CSV","btn.exportStatement":"Export Statement","btn.newShipment":"New Shipment","btn.newPayment":"New Payment","btn.saveBooking":"Save Booking","btn.edit":"Edit","btn.delete":"Delete","booking.title":"Booking Management","booking.subtitle":"Manage booking data, space status, estimated receivables/payables and rate entry in one place.","booking.rateEntry":"Rate Entry","booking.kpiToday":"Today Bookings","booking.kpiWeek":"This Week Bookings","booking.kpiPending":"Pending Confirmation","booking.kpiReleased":"Space Released","booking.kpiDeparted":"Departed","booking.kpiProfit":"Estimated Gross Profit","booking.quickForm":"Quick Booking Form","booking.records":"Booking Records","booking.rateTitle":"Rate Management Entry","booking.rateHint":"This Sprint provides the base structure only; a quotation system can be added later.","booking.empty":"No booking records",
     "field.bookingDate":"Booking Date","field.customer":"Customer","field.airline":"Airline","field.agent":"Booking Agent","field.flightNo":"Flight No.","field.masterNo":"MAWB / B/L No.","field.originAirport":"Origin Airport","field.destinationAirport":"Destination Airport","field.etd":"ETD","field.eta":"ETA","field.ctn":"Pieces","field.weight":"Weight","field.volumeWeight":"Volume Weight","field.receivableEst":"Estimated Receivable","field.payableEst":"Estimated Payable","field.profitEst":"Estimated Profit","field.status":"Status","field.releaseNo":"Release No.","field.sales":"Sales","field.note":"Remark","field.unitPrice":"Unit Price","field.currency":"Currency","field.validUntil":"Valid Until","field.actions":"Actions"
   }
@@ -1865,6 +1889,7 @@ function renderShipments() {
         <div class="row-actions shipment-actions">
           <button title="生成派送单" data-delivery-note="${s.id}">单</button>
           <button title="生成单票账单" data-shipment-bill="${s.id}">账</button>
+          ${s.open > 0.009 ? `<button title="未收对冲/核销调整" data-adjust-open="${s.id}">冲</button>` : ""}
           <button title="详情" data-edit-shipment="${s.id}">详</button>
           <button class="danger-action" title="删除" data-delete-shipment="${s.id}">删</button>
         </div>
@@ -1893,6 +1918,7 @@ function renderPayments() {
         <td class="money">${money(paymentRmb(p))}</td>
         <td>${escapeHtml(p.receiveAccount || "")}</td>
         <td>${escapeHtml(p.method)}</td>
+        <td>${escapeHtml([p.voucherName, p.note].filter(Boolean).join(" / "))}</td>
         <td>
           <div class="row-actions">
             <button title="编辑" data-edit-payment="${p.id}">改</button>
@@ -1901,7 +1927,7 @@ function renderPayments() {
         </td>
       </tr>
     `;
-  }).join("") : `<tr><td colspan="12" class="empty">暂无回款记录</td></tr>`;
+  }).join("") : `<tr><td colspan="13" class="empty">暂无回款记录</td></tr>`;
 }
 
 
@@ -2011,10 +2037,29 @@ function renderCustomerUpgradeCards() {
   `;
 }
 
+function renderCreditRows() {
+  if (!els.creditRows) return;
+  const rows = customerPerformanceSummary().filter((row) => row.receivable > 0).sort((a, b) => b.open - a.open);
+  els.creditRows.innerHTML = rows.length ? rows.map((row) => {
+    const policy = creditPolicyForCustomer(row);
+    const level = enhancedRiskLevel(row);
+    return `<tr>
+      <td><button class="link-cell" type="button" data-preview-customer="${escapeHtml(row.customer)}">${escapeHtml(row.customer)}</button></td>
+      <td class="money">${money(policy.creditLimit)}</td>
+      <td>${percent(policy.usedRate)}</td>
+      <td>${policy.creditDays}天</td>
+      <td>${policy.overdueDays}天</td>
+      <td><span class="status ${level === "高风险" ? "open" : level === "需跟进" ? "balance" : "paid"}">${escapeHtml(level)}</span></td>
+      <td>${escapeHtml(riskSuggestion(row))}</td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="7" class="empty">暂无客户信用数据</td></tr>`;
+}
+
 function renderCustomers() {
   const q = document.querySelector("#customerSearch").value.trim().toLowerCase();
   const rows = customerSummary().filter((c) => !q || c.customer.toLowerCase().includes(q));
   renderCustomerUpgradeCards();
+  renderCreditRows();
   const pendingRows = rows.filter((c) => number(c.open) > 0.009);
   const completedRows = rows.filter((c) => number(c.open) <= 0.009);
   els.customerRows.innerHTML = renderCustomerSummaryRows(pendingRows, "暂无未完成结算客户单位");
@@ -2142,6 +2187,7 @@ function renderFinance() {
   document.querySelector("#financeRevenue").textContent = money(summary.revenue);
   document.querySelector("#financeBizCost").textContent = money(summary.bizCost);
   document.querySelector("#financeGrossProfit").textContent = money(summary.grossProfit);
+  document.querySelector("#financeOffset").textContent = money(summary.offset);
   document.querySelector("#financeExpense").textContent = money(summary.expense);
   document.querySelector("#financeNetProfit").textContent = money(summary.netProfit);
 
@@ -2173,6 +2219,18 @@ function renderFinance() {
       <span class="money">${money(item.amount)}</span>
     </div>
   `).join("") : `<div class="empty">暂无费用数据</div>`;
+
+  if (els.offsetBars) {
+    const offsets = offsetAdjustmentRows().map((payment) => ({ label: `${payment.customer || "未填客户"} · ${payment.waybill || "客户级"}`, amount: paymentRmb(payment), method: payment.method || payment.receiveAccount }));
+    const maxOffset = Math.max(1, ...offsets.map((item) => item.amount));
+    els.offsetBars.innerHTML = offsets.length ? offsets.map((item) => `
+      <div class="bar-row offset-row">
+        <strong>${escapeHtml(item.label)}</strong>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.max(4, item.amount / maxOffset * 100)}%"></div></div>
+        <span class="money">${money(item.amount)}</span>
+      </div>
+    `).join("") : `<div class="empty">暂无未收对冲/核销调整</div>`;
+  }
 }
 
 function accountLedgerRows() {
@@ -4712,6 +4770,39 @@ function saveQuickPayment(event) {
   render();
 }
 
+function adjustOpenReceivable(shipmentId) {
+  const shipment = state.shipments.find((item) => item.id === shipmentId);
+  if (!shipment) return;
+  const st = settlement(shipment);
+  if (st.open <= 0.009) {
+    alert("该票已无未收金额，无需调整。");
+    return;
+  }
+  const action = prompt(`请输入调整方式：未收对冲 或 坏账核销\n当前未收：${money(st.open)}`, "未收对冲");
+  if (!action) return;
+  const method = action.includes("坏账") ? "坏账核销" : "未收对冲";
+  const receiveAccount = method === "坏账核销" ? "QT坏账核销" : "QT业务往来冲账";
+  const amountText = prompt("请输入调整金额（RMB）", money(st.open).replace(/,/g, ""));
+  const amount = Math.min(st.open, number(amountText));
+  if (amount <= 0) return;
+  state.payments.push({
+    id: id("p"),
+    date: today(),
+    customer: shipment.customer || "",
+    waybill: shipment.waybill || shipment.masterNo || "",
+    account: "系统调整",
+    currency: "RMB",
+    amount,
+    rate: 1,
+    receiveAccount,
+    voucherName: "",
+    method,
+    note: `${method}：${shipment.waybill || shipment.masterNo || "未填单号"}`,
+  });
+  saveState();
+  render();
+}
+
 function saveCustomer(event) {
   event.preventDefault();
   const record = formToObject(els.customerForm);
@@ -5860,6 +5951,7 @@ function bindEvents() {
     const deleteShipmentId = target.dataset.deleteShipment;
     const deliveryNoteId = target.dataset.deliveryNote;
     const shipmentBillId = target.dataset.shipmentBill;
+    const adjustOpenId = target.dataset.adjustOpen;
     const trackShipmentId = target.dataset.trackShipment;
     const podShipmentId = target.dataset.podShipment;
     const podViewFile = target.dataset.podViewFile;
@@ -5961,6 +6053,10 @@ function bindEvents() {
     }
     if (podShipmentId) {
       openPodRecord(podShipmentId);
+      return;
+    }
+    if (adjustOpenId) {
+      adjustOpenReceivable(adjustOpenId);
       return;
     }
     if (deliveryNoteId) openDeliveryNote(deliveryNoteId);
