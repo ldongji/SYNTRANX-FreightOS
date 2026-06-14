@@ -20,48 +20,40 @@
         </div>
       </div>
 
-      <nav class="nav" aria-label="主导航">
-        <button class="nav-item active" data-view="dashboard">
-          <span>老板驾驶舱</span>
-        </button>
-        <button class="nav-item" data-view="aging">
-          <span>账龄分析</span>
-        </button>
-        <button class="nav-item" data-view="riskCustomers">
-          <span>风险客户中心</span>
-        </button>
-        <button class="nav-item" data-view="profitRank">
-          <span>利润排行</span>
-        </button>
-        <button class="nav-item" data-view="shipments">
-          <span>业务中心</span>
-        </button>
-        <button class="nav-item" data-view="operations">
-          <span>操作中心</span>
-        </button>
-        <button class="nav-item" data-view="booking">
-          <span>订舱管理</span>
-        </button>
-        <button class="nav-item" data-view="payments">
-          <span>回款核销</span>
-        </button>
-        <button class="nav-item" data-view="customers">
-          <span>客户中心</span>
-        </button>
-        <button class="nav-item" data-view="finance">
-          <span>费用管理</span>
-        </button>
-        <button class="nav-item" data-view="accounts">
-          <span>账户流水</span>
-        </button>
-        <button class="nav-item" data-view="settings">
-          <span>系统设置</span>
-        </button>
+      <nav class="nav module-nav" aria-label="主导航">
+        <div class="nav-group">
+          <button class="nav-item active" data-view="dashboard"><span class="nav-icon">📊</span><span data-i18n="nav.dashboard">老板驾驶舱</span></button>
+          <div class="nav-sub"><button data-jump="dashboard" data-i18n="nav.overview">经营总览</button><button data-jump="aging" data-i18n="nav.aging">账龄结构</button><button data-jump="riskCustomers" data-i18n="nav.riskCustomers">风险客户</button><button data-jump="profitRank" data-i18n="nav.profitRank">利润排行</button><button data-jump="dashboard" data-i18n="nav.opsAlerts">运营预警</button></div>
+        </div>
+        <div class="nav-group">
+          <button class="nav-item" data-view="shipments"><span class="nav-icon">📦</span><span data-i18n="nav.business">业务管理</span></button>
+          <div class="nav-sub"><button data-jump="shipments" data-i18n="nav.shipments">运单管理</button><button data-jump="booking" data-i18n="nav.booking">订舱管理</button><button data-jump="customers" data-i18n="nav.customerBills">客户账单</button></div>
+        </div>
+        <div class="nav-group">
+          <button class="nav-item" data-view="operations"><span class="nav-icon">🚚</span><span data-i18n="nav.transport">运输操作</span></button>
+          <div class="nav-sub"><button data-jump="operations" data-i18n="nav.inbound">入仓</button><button data-jump="operations" data-i18n="nav.outbound">出仓</button><button data-jump="operations" data-i18n="nav.customs">清关</button><button data-jump="operations" data-i18n="nav.delivery">派送</button><button data-jump="operations" data-i18n="nav.pod">签收</button><button data-jump="operations" data-i18n="nav.exceptions">异常件</button></div>
+        </div>
+        <div class="nav-group">
+          <button class="nav-item" data-view="customers"><span class="nav-icon">👥</span><span data-i18n="nav.customerMgmt">客户管理</span></button>
+          <div class="nav-sub"><button data-jump="settings" data-i18n="nav.customerProfiles">客户档案</button><button data-jump="customers" data-i18n="nav.customerLedger">客户总账</button><button data-jump="customers" data-i18n="nav.receivables">应收账款</button><button data-jump="aging" data-i18n="nav.agingAnalysis">账龄分析</button><button data-jump="riskCustomers" data-i18n="nav.riskCustomers">风险客户</button></div>
+        </div>
+        <div class="nav-group">
+          <button class="nav-item" data-view="payments"><span class="nav-icon">💰</span><span data-i18n="nav.financeCenter">财务中心</span></button>
+          <div class="nav-sub"><button data-jump="payments" data-i18n="nav.paymentApply">回款核销</button><button data-jump="finance" data-i18n="nav.expenseMgmt">费用管理</button><button data-jump="profitRank" data-i18n="nav.profitAnalysis">利润分析</button><button data-jump="accounts" data-i18n="nav.accountFlow">账户流水</button></div>
+        </div>
+        <div class="nav-group">
+          <button class="nav-item" data-view="profitRank"><span class="nav-icon">📑</span><span data-i18n="nav.reports">报表中心</span></button>
+          <div class="nav-sub"><button data-jump="shipments" data-i18n="nav.shipmentReport">运单报表</button><button data-jump="customers" data-i18n="nav.customerReport">客户报表</button><button data-jump="finance" data-i18n="nav.financeReport">财务报表</button><button data-jump="aging" data-i18n="nav.agingReport">账龄报表</button><button data-jump="profitRank" data-i18n="nav.profitReport">利润报表</button></div>
+        </div>
+        <div class="nav-group">
+          <button class="nav-item" data-view="settings"><span class="nav-icon">⚙️</span><span data-i18n="nav.settings">系统设置</span></button>
+          <div class="nav-sub"><button data-jump="settings" data-i18n="nav.customerData">客户资料</button><button data-jump="settings" data-i18n="nav.channelMgmt">渠道管理</button><button data-jump="settings" data-i18n="nav.destinationMgmt">目的地管理</button><button data-jump="settings" data-i18n="nav.productMgmt">运输产品管理</button><button data-jump="booking" data-i18n="nav.airlineMgmt">航空公司管理</button><button data-jump="settings" data-i18n="nav.deliveryVendorMgmt">派送商管理</button><button data-jump="accounts" data-i18n="nav.bankSettings">银行账户设置</button></div>
+        </div>
       </nav>
 
       <div class="sidebar-footer">
-        <button class="ghost-btn" id="exportAllBtn">导出全部数据</button>
-        <button class="danger-link" id="resetDemoBtn">清空本机数据</button>
+        <button class="ghost-btn" id="exportAllBtn" data-i18n="btn.exportAll">导出全部数据</button>
+        <button class="danger-link" id="resetDemoBtn" data-i18n="btn.clearLocal">清空本机数据</button>
       </div>
     </aside>
 
@@ -71,14 +63,14 @@
           <p class="eyebrow">SYNTRANX Freight OS</p>
           <h2 id="viewTitle">老板驾驶舱</h2>
         </div>
-        <div class="top-actions">
+        <div class="top-actions"><select id="languageSelect" class="language-select" aria-label="Language"><option value="zh">中文</option><option value="en">English</option></select>
           <label class="file-import">
-            导入登记CSV
+            <span data-i18n="btn.importCsv">导入登记CSV</span>
             <input type="file" id="shipmentImport" accept=".csv,text/csv">
           </label>
-          <button class="secondary-btn" id="statementBtn">导出账单</button>
-          <button class="primary-btn" id="quickShipmentBtn">新增业务</button>
-          <button class="secondary-btn" id="quickPaymentBtn">登记回款</button>
+          <button class="secondary-btn" id="statementBtn" data-i18n="btn.exportStatement">导出账单</button>
+          <button class="primary-btn" id="quickShipmentBtn" data-i18n="btn.newShipment">新增业务</button>
+          <button class="secondary-btn" id="quickPaymentBtn" data-i18n="btn.newPayment">登记回款</button>
         </div>
       </header>
 
@@ -445,70 +437,50 @@
       <section class="view" id="bookingView">
         <section class="entry-panel booking-center">
           <div class="panel-head">
-            <h3>订舱中心</h3>
-            <span class="panel-note">普空运订舱资料、舱位状态、预估应收应付统一登记。</span>
+            <div><h3 data-i18n="booking.title">订舱管理</h3><span class="panel-note" data-i18n="booking.subtitle">订舱资料、舱位状态、预估应收应付与运价入口统一管理。</span></div>
+            <button type="button" class="secondary-btn small" data-jump="ratePanel" data-i18n="booking.rateEntry">运价管理入口</button>
           </div>
-          <div class="booking-summary">
-            <div><span>订舱票数</span><strong id="bookingCount">0</strong></div>
-            <div><span>订舱件数</span><strong id="bookingCtn">0</strong></div>
-            <div><span>订舱重量</span><strong id="bookingWeight">0.00</strong></div>
-            <div><span>预估毛利</span><strong id="bookingProfit">0.00</strong></div>
+          <div class="booking-summary kpi-grid">
+            <div><span data-i18n="booking.kpiToday">今日订舱票数</span><strong id="bookingTodayCount">0</strong></div>
+            <div><span data-i18n="booking.kpiWeek">本周订舱票数</span><strong id="bookingWeekCount">0</strong></div>
+            <div><span data-i18n="booking.kpiPending">待确认订舱</span><strong id="bookingPendingCount">0</strong></div>
+            <div><span data-i18n="booking.kpiReleased">已放舱</span><strong id="bookingReleasedCount">0</strong></div>
+            <div><span data-i18n="booking.kpiDeparted">已起飞</span><strong id="bookingDepartedCount">0</strong></div>
+            <div><span data-i18n="booking.kpiProfit">预计毛利</span><strong id="bookingProfit">0.00</strong></div>
           </div>
+          <div class="booking-status-board" id="bookingStatusBoard"></div>
+          <div class="section-title"><h4 data-i18n="booking.quickForm">快速订舱表单</h4></div>
           <form id="bookingForm" class="quick-grid booking-grid">
-            <label>订舱日期<input name="date" type="date"></label>
-            <label>客户单位<input name="customer" list="customerList" placeholder="例如：MVW"></label>
-            <label>航空公司<input name="airline" placeholder="例如：EK / QR / SV"></label>
-            <label>订舱代理<input name="agent" placeholder="例如：货站/代理名称"></label>
-            <label>航班号<input name="flightNo" placeholder="例如：EK363"></label>
-            <label>主单号/提单号<input name="masterNo" list="masterNoList"></label>
-            <label>起飞机场<input name="originAirport" placeholder="例如：CAN"></label>
-            <label>目的机场<input name="destinationAirport" placeholder="例如：DXB"></label>
-            <label>预计起飞<input name="etd" type="date"></label>
-            <label>预计到达<input name="eta" type="date"></label>
-            <label>订舱件数<input name="ctn" type="number" step="1" min="0"></label>
-            <label>订舱重量<input name="weight" type="number" step="0.01" min="0"></label>
-            <label>订舱体积重<input name="volumeWeight" type="number" step="0.01" min="0"></label>
-            <label>应收预估<input name="receivable" type="number" step="0.01" min="0"></label>
-            <label>应付预估<input name="payable" type="number" step="0.01" min="0"></label>
-            <label>订舱状态<select name="status">
-              <option>待订舱</option>
-              <option>已订舱</option>
-              <option>已交货站</option>
-              <option>已起飞</option>
-              <option>已到港</option>
-              <option>异常</option>
-            </select></label>
-            <label>备注<input name="note"></label>
-            <button class="primary-btn" type="submit">保存订舱</button>
+            <label><span data-i18n="field.bookingDate">订舱日期</span><input name="date" type="date"></label>
+            <label><span data-i18n="field.customer">客户单位</span><input name="customer" list="customerList" placeholder="例如：MVW"></label>
+            <label><span data-i18n="field.airline">航空公司</span><input name="airline" placeholder="例如：EK / QR / SV"></label>
+            <label><span data-i18n="field.agent">订舱代理</span><input name="agent" placeholder="例如：货站/代理名称"></label>
+            <label><span data-i18n="field.flightNo">航班号</span><input name="flightNo" placeholder="例如：EK363"></label>
+            <label><span data-i18n="field.masterNo">主单号/提单号</span><input name="masterNo" list="masterNoList"></label>
+            <label><span data-i18n="field.originAirport">起飞机场</span><input name="originAirport" placeholder="例如：CAN"></label>
+            <label><span data-i18n="field.destinationAirport">目的机场</span><input name="destinationAirport" placeholder="例如：DXB"></label>
+            <label><span data-i18n="field.etd">预计起飞</span><input name="etd" type="date"></label>
+            <label><span data-i18n="field.eta">预计到达</span><input name="eta" type="date"></label>
+            <label><span data-i18n="field.ctn">件数</span><input name="ctn" type="number" step="1" min="0"></label>
+            <label><span data-i18n="field.weight">重量</span><input name="weight" type="number" step="0.01" min="0"></label>
+            <label><span data-i18n="field.volumeWeight">体积重</span><input name="volumeWeight" type="number" step="0.01" min="0"></label>
+            <label><span data-i18n="field.receivableEst">应收预估</span><input name="receivable" type="number" step="0.01" min="0"></label>
+            <label><span data-i18n="field.payableEst">应付预估</span><input name="payable" type="number" step="0.01" min="0"></label>
+            <label><span data-i18n="field.profitEst">毛利预估</span><input name="profitPreview" type="number" step="0.01" readonly></label>
+            <label><span data-i18n="field.status">状态</span><select name="status"></select></label>
+            <label><span data-i18n="field.releaseNo">放舱号</span><input name="releaseNo"></label>
+            <label><span data-i18n="field.sales">业务员</span><input name="sales"></label>
+            <label><span data-i18n="field.note">备注</span><input name="note"></label>
+            <button class="primary-btn" type="submit" data-i18n="btn.saveBooking">保存订舱</button>
           </form>
-          <div class="table-wrap compact-op-table">
-            <table class="data-table booking-table">
-              <thead>
-                <tr>
-                  <th>订舱日期</th>
-                  <th>客户单位</th>
-                  <th>航空公司</th>
-                  <th>订舱代理</th>
-                  <th>航班号</th>
-                  <th>主单号/提单号</th>
-                  <th>起飞机场</th>
-                  <th>目的机场</th>
-                  <th>预计起飞</th>
-                  <th>预计到达</th>
-                  <th>件数</th>
-                  <th>重量</th>
-                  <th>体积重</th>
-                  <th>应收预估</th>
-                  <th>应付预估</th>
-                  <th>毛利预估</th>
-                  <th>状态</th>
-                  <th>备注</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="bookingRows"></tbody>
-            </table>
-          </div>
+          <div class="section-title"><h4 data-i18n="booking.records">订舱记录表</h4></div>
+          <div class="table-wrap compact-op-table"><table class="data-table booking-table"><thead><tr id="bookingTableHead"></tr></thead><tbody id="bookingRows"></tbody></table></div>
+          <section class="rate-panel" id="ratePanel">
+            <div class="section-title"><h4 data-i18n="booking.rateTitle">运价管理入口</h4><p data-i18n="booking.rateHint">当前 Sprint 仅提供基础结构，后续可扩展为报价系统。</p></div>
+            <div class="quick-grid rate-grid">
+              <label><span data-i18n="field.airline">航空公司</span><input placeholder="EK / QR / SV"></label><label><span data-i18n="field.originAirport">起飞机场</span><input placeholder="CAN"></label><label><span data-i18n="field.destinationAirport">目的机场</span><input placeholder="DXB"></label><label><span data-i18n="field.unitPrice">单价</span><input type="number" step="0.01"></label><label><span data-i18n="field.currency">币种</span><select><option>RMB</option><option>USD</option><option>AED</option></select></label><label><span data-i18n="field.validUntil">有效期</span><input type="date"></label><label><span data-i18n="field.note">备注</span><input></label>
+            </div>
+          </section>
         </section>
       </section>
 
